@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,25 +41,299 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.foundation.BorderStroke
 import com.example.data.ScoreRecord
-import com.example.game.GameNote
 import com.example.game.GameViewModel
 import com.example.game.Song
+import com.example.game.AppTheme
+import com.example.game.AppLanguage
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Style Constants
-val DeepSpaceBg = Color(0xFF1D1B20)
-val SlateCardBg = Color(0xFF2B2930)
-val AccentCyan = Color(0xFFB3E5FC)
-val AccentPink = Color(0xFFF48FB1)
-val AccentLavender = Color(0xFFD0BCFE)
-val AccentGreen = Color(0xFFA5D6A7)
-val LightAccentText = Color(0xFFCCC2DC)
-val TextLight = Color(0xFFE6E1E5)
-val KeyPassiveBg = Color(0xFF49454F)
+// Dynamic Theme System and Localizations
+data class ThemeColors(
+    val bg: Color,
+    val cardBg: Color,
+    val accentCyan: Color,  // lane 1
+    val accentPink: Color,  // lane 2
+    val accentLavender: Color, // lane 0 / generic highlight
+    val accentGreen: Color, // lane 3 / successes
+    val lightAccentText: Color,
+    val textLight: Color,
+    val keyPassiveBg: Color
+)
+
+object ThemeManager {
+    fun getColors(theme: AppTheme): ThemeColors {
+        return when (theme) {
+            AppTheme.DEEP_SPACE -> ThemeColors(
+                bg = Color(0xFF131118),
+                cardBg = Color(0xFF211F26),
+                accentCyan = Color(0xFF80DEEA),
+                accentPink = Color(0xFFFF8A80),
+                accentLavender = Color(0xFFD0BCFE),
+                accentGreen = Color(0xFFA5D6A7),
+                lightAccentText = Color(0xFFCCC2DC),
+                textLight = Color(0xFFE6E1E5),
+                keyPassiveBg = Color(0xFF49454F)
+            )
+            AppTheme.CYBERPUNK -> ThemeColors(
+                bg = Color(0xFF0F0C1B),
+                cardBg = Color(0xFF1E152E),
+                accentCyan = Color(0xFF00E5FF),
+                accentPink = Color(0xFFFF007F),
+                accentLavender = Color(0xFFFFEA00),
+                accentGreen = Color(0xFF39FF14),
+                lightAccentText = Color(0xFFFFEA00),
+                textLight = Color(0xFFF3E5F5),
+                keyPassiveBg = Color(0xFF381F4B)
+            )
+            AppTheme.CHERRY_BLOSSOM -> ThemeColors(
+                bg = Color(0xFFFFF5F6),
+                cardBg = Color(0xFFFCE4EC),
+                accentCyan = Color(0xFF81D4FA),
+                accentPink = Color(0xFFFF4081),
+                accentLavender = Color(0xFF9C27B0),
+                accentGreen = Color(0xFF4CAF50),
+                lightAccentText = Color(0xFF8D6E63),
+                textLight = Color(0xFF3E2723),
+                keyPassiveBg = Color(0xFFE1BEE7)
+            )
+            AppTheme.RETRO_EMERALD -> ThemeColors(
+                bg = Color(0xFF081C0E),
+                cardBg = Color(0xFF15331C),
+                accentCyan = Color(0xFFA9DFBF),
+                accentPink = Color(0xFF58D68D),
+                accentLavender = Color(0xFFCCFF90),
+                accentGreen = Color(0xFF2ECC71),
+                lightAccentText = Color(0xFF9FD6B2),
+                textLight = Color(0xFFE8F5E9),
+                keyPassiveBg = Color(0xFF1E4227)
+            )
+            AppTheme.MONOCHROME -> ThemeColors(
+                bg = Color(0xFF121212),
+                cardBg = Color(0xFF222222),
+                accentCyan = Color(0xFFCCCCCC),
+                accentPink = Color(0xFFFFFFFF),
+                accentLavender = Color(0xFFE0E0E0),
+                accentGreen = Color(0xFF999999),
+                lightAccentText = Color(0xFF888888),
+                textLight = Color(0xFFF5F5F5),
+                keyPassiveBg = Color(0xFF3A3A3A)
+            )
+        }
+    }
+}
+
+object TranslationManager {
+    private val translations = mapOf(
+        AppLanguage.EN to mapOf(
+            "choose_song" to "CHOOSE SONG",
+            "tap_to_play" to "START PLAYING",
+            "select_diff" to "CHOOSE DIFFICULTY",
+            "clear_records" to "CLEAR RECORDS",
+            "confirm_clear" to "Are you sure you want to clear all high scores?",
+            "yes" to "YES, CLEAR",
+            "cancel" to "CANCEL",
+            "high_score_title" to "Best Record",
+            "no_scores" to "No play history recorded yet.",
+            "total_score" to "Total Score",
+            "max_combo" to "Max Combo",
+            "accuracy" to "Accuracy",
+            "perfects" to "Perfects",
+            "greats" to "Greats",
+            "goods" to "Goods",
+            "misses" to "Misses",
+            "retry" to "REPLAY SONG",
+            "exit" to "BACK TO TITLE",
+            "perfect" to "PERFECT",
+            "great" to "GREAT",
+            "good" to "GOOD",
+            "miss" to "MISS",
+            "failed" to "STAGE FAILED",
+            "results" to "STAGE CLEAR",
+            "rank" to "Rank",
+            "history" to "RECENT PLAY HISTORIES",
+            "bpm" to "BPM",
+            "notes" to "Notes",
+            "easy" to "Easy",
+            "normal" to "Normal",
+            "hard" to "Hard",
+            "settings" to "System Settings"
+        ),
+        AppLanguage.ES to mapOf(
+            "choose_song" to "ELEGIR CANCIÓN",
+            "tap_to_play" to "EMPEZAR JUEGO",
+            "select_diff" to "ELEGIR DIFICULTAD",
+            "clear_records" to "BORRAR HISTORIAL",
+            "confirm_clear" to "¿Estás seguro de que deseas borrar los puntajes?",
+            "yes" to "SÍ, BORRAR",
+            "cancel" to "CANCELAR",
+            "high_score_title" to "Récord Máximo",
+            "no_scores" to "No hay puntajes guardados aún.",
+            "total_score" to "Puntaje Total",
+            "max_combo" to "Combo Máximo",
+            "accuracy" to "Precisión",
+            "perfects" to "Perfectos",
+            "greats" to "Grandiosos",
+            "goods" to "Buenos",
+            "misses" to "Fallos",
+            "retry" to "REINTENTAR CANCIÓN",
+            "exit" to "SALIR AL TITLE",
+            "perfect" to "PERFECTO",
+            "great" to "GRANDIOSO",
+            "good" to "BUENO",
+            "miss" to "FALLO",
+            "failed" to "INTENTO FALLADO",
+            "results" to "FASE COMPLETADA",
+            "rank" to "Rango",
+            "history" to "HISTORIAL RECIENTE",
+            "bpm" to "BPM",
+            "notes" to "Notas",
+            "easy" to "Fácil",
+            "normal" to "Normal",
+            "hard" to "Difícil",
+            "settings" to "Ajustes del Sistema"
+        ),
+        AppLanguage.PT to mapOf(
+            "choose_song" to "ESCOLHER MÚSICA",
+            "tap_to_play" to "COMEÇAR JOGADA",
+            "select_diff" to "CHOOSE DIFFICULTY",
+            "clear_records" to "APAGAR RECORDE",
+            "confirm_clear" to "Apagar logs de pontuação para sempre?",
+            "yes" to "SIM, APAGAR",
+            "cancel" to "CANCELAR",
+            "high_score_title" to "Melhor Recorde",
+            "no_scores" to "Histórico de jogo vazio.",
+            "total_score" to "Pontos Totais",
+            "max_combo" to "Combo Máximo",
+            "accuracy" to "Precisão",
+            "perfects" to "Perfeitos",
+            "greats" to "Excelentes",
+            "goods" to "Bons",
+            "misses" to "Erros",
+            "retry" to "REPETIR MÚSICA",
+            "exit" to "SAIR PARA O TITULO",
+            "perfect" to "PERFEITO",
+            "great" to "EXCELENTE",
+            "good" to "BOM",
+            "miss" to "ERRO",
+            "failed" to "MÚSICA FALHOU",
+            "results" to "MÚSICA CONCLUÍDA",
+            "rank" to "Rank",
+            "history" to "HISTORICO DE JOGOS",
+            "bpm" to "BPM",
+            "notes" to "Notas",
+            "easy" to "Fácil",
+            "normal" to "Normal",
+            "hard" to "Difícil",
+            "settings" to "Configurações"
+        ),
+        AppLanguage.JA to mapOf(
+            "choose_song" to "楽曲を選択",
+            "tap_to_play" to "プレイ開始",
+            "select_diff" to "難易度設定",
+            "clear_records" to "履歴を消去",
+            "confirm_clear" to "すべてのハイスコアを消去しますか？",
+            "yes" to "消去する",
+            "cancel" to "キャンセル",
+            "high_score_title" to "ベスト記録",
+            "no_scores" to "プレイ履歴がまだありません。",
+            "total_score" to "合計スコア",
+            "max_combo" to "最大コンボ",
+            "accuracy" to "正確度",
+            "perfects" to "パーフェクト",
+            "greats" to "グレート",
+            "goods" to "グッド",
+            "misses" to "ミス",
+            "retry" to "もう一度プレイ",
+            "exit" to "タイトルに戻る",
+            "perfect" to "PERFECT",
+            "great" to "GREAT",
+            "good" to "GOOD",
+            "miss" to "MISS",
+            "failed" to "ゲームオーバー",
+            "results" to "リザルト発表",
+            "rank" to "ランク",
+            "history" to "最近のプレイ履歴",
+            "bpm" to "BPM",
+            "notes" to "ノート数",
+            "easy" to "かんたん",
+            "normal" to "ふつう",
+            "hard" to "むずかしい",
+            "settings" to "システム設定"
+        ),
+        AppLanguage.DE to mapOf(
+            "choose_song" to "SONG AUSWÄHLEN",
+            "tap_to_play" to "SPIEL STARTEN",
+            "select_diff" to "SCHWIERIGKEITSGRAD",
+            "clear_records" to "HISTORIE LÖSCHEN",
+            "confirm_clear" to "Möchten Sie alle Highscores wirklich löschen?",
+            "yes" to "JA, LÖSCHEN",
+            "cancel" to "ABBRECHEN",
+            "high_score_title" to "Bestleistung",
+            "no_scores" to "Noch keine Spieldaten vorhanden.",
+            "total_score" to "Gesamtpunkte",
+            "max_combo" to "Max Combo",
+            "accuracy" to "Präzision",
+            "perfects" to "Perfekt",
+            "greats" to "Sehr Gut",
+            "goods" to "Gut",
+            "misses" to "Miss",
+            "retry" to "LIED WIEDERHOLEN",
+            "exit" to "ZUM TITEL",
+            "perfect" to "PERFEKT",
+            "great" to "SEHR GUT",
+            "good" to "GUT",
+            "miss" to "FEHLER",
+            "failed" to "FEHLGESCHLAGEN",
+            "results" to "STAGE ERFOLGREICH",
+            "rank" to "Rang",
+            "history" to "LETZTE RUNDEN",
+            "bpm" to "BPM",
+            "notes" to "Noten",
+            "easy" to "Einfach",
+            "normal" to "Normal",
+            "hard" to "Schwer",
+            "settings" to "System-Einstellungen"
+        )
+    )
+
+    fun getString(key: String, lang: AppLanguage): String {
+        return translations[lang]?.get(key) ?: translations[AppLanguage.EN]?.get(key) ?: key
+    }
+}
+
+@Composable
+fun RowScope.ThemeChip(
+    theme: AppTheme,
+    activeTheme: AppTheme,
+    colors: ThemeColors,
+    onClick: () -> Unit
+) {
+    val isSelected = (theme == activeTheme)
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .height(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isSelected) colors.accentLavender else colors.keyPassiveBg.copy(alpha = 0.4f))
+            .border(1.dp, if (isSelected) colors.accentLavender else colors.keyPassiveBg.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = theme.displayName.uppercase(),
+            style = MaterialTheme.typography.bodySmall.copy(
+                fontWeight = FontWeight.Bold,
+                fontSize = 9.sp
+            ),
+            color = if (isSelected) colors.bg else colors.textLight,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
 
 @Composable
 fun MainRhythmApp(
@@ -67,10 +341,12 @@ fun MainRhythmApp(
     modifier: Modifier = Modifier
 ) {
     val gameState by viewModel.gameState.collectAsStateWithLifecycle()
+    val activeTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
+    val colors = ThemeManager.getColors(activeTheme)
 
     Surface(
         modifier = modifier.fillMaxSize(),
-        color = DeepSpaceBg
+        color = colors.bg
     ) {
         when (gameState) {
             GameViewModel.GameState.TITLE -> TitleScreen(viewModel)
@@ -89,12 +365,14 @@ fun TitleScreen(viewModel: GameViewModel) {
     val selectedSong by viewModel.selectedSong.collectAsStateWithLifecycle()
     val highScoreRecord by viewModel.highScore.collectAsStateWithLifecycle()
     val historyList by viewModel.allScores.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
+    val activeTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
     
-    val context = LocalContext.current
+    val colors = ThemeManager.getColors(activeTheme)
     val haptic = LocalHapticFeedback.current
 
     // Trigger initial observing hook
-    LaunchedEffect(Unit) {
+    LaunchedEffect(selectedSong) {
         viewModel.observeHighScoreForSelectedSong()
     }
 
@@ -102,7 +380,7 @@ fun TitleScreen(viewModel: GameViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing),
-        containerColor = DeepSpaceBg
+        containerColor = colors.bg
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -121,7 +399,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                     fontFamily = FontFamily.Monospace,
                     letterSpacing = 4.sp
                 ),
-                color = TextLight,
+                color = colors.textLight,
                 textAlign = TextAlign.Center
             )
             
@@ -131,7 +409,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 2.sp
                 ),
-                color = AccentLavender,
+                color = colors.accentLavender,
                 textAlign = TextAlign.Center
             )
 
@@ -144,15 +422,120 @@ fun TitleScreen(viewModel: GameViewModel) {
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Section 0: Settings Panel (Theme and Language Row selections)
+                item {
+                    Text(
+                        text = TranslationManager.getString("settings", currentLanguage).uppercase(),
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        ),
+                        color = colors.lightAccentText,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+
+                    // Unified language/theme card panel
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colors.cardBg)
+                            .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "Language / Idioma / 言語",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = colors.textLight.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            AppLanguage.values().forEach { lang ->
+                                val isSelected = (lang == currentLanguage)
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(38.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (isSelected) colors.accentLavender else colors.keyPassiveBg.copy(alpha = 0.4f))
+                                        .border(1.dp, if (isSelected) colors.accentLavender else colors.keyPassiveBg.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            viewModel.changeLanguage(lang)
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = lang.name,
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        ),
+                                        color = if (isSelected) colors.bg else colors.textLight
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "App Color Theme",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = colors.textLight.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        // Theme Buttons
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val themes = AppTheme.values()
+                            // First row: 3 themes
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                themes.take(3).forEach { t ->
+                                    ThemeChip(t, activeTheme, colors, onClick = {
+                                        viewModel.changeTheme(t)
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    })
+                                }
+                            }
+                            // Second row: 2 themes
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                themes.drop(3).forEach { t ->
+                                    ThemeChip(t, activeTheme, colors, onClick = {
+                                        viewModel.changeTheme(t)
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    })
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
                 // Section 1: Song Selection
                 item {
                     Text(
-                        text = "SELECT SONG",
+                        text = TranslationManager.getString("choose_song", currentLanguage),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp
                         ),
-                        color = TextLight,
+                        color = colors.textLight,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
@@ -161,6 +544,8 @@ fun TitleScreen(viewModel: GameViewModel) {
                         SongCard(
                             song = song,
                             isSelected = song.name == selectedSong.name,
+                            colors = colors,
+                            currentLanguage = currentLanguage,
                             onClick = {
                                 viewModel.changeSelectedSong(song)
                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -174,12 +559,12 @@ fun TitleScreen(viewModel: GameViewModel) {
                 item {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "BEST RECORD",
+                        text = TranslationManager.getString("high_score_title", currentLanguage).uppercase(),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 1.5.sp
                         ),
-                        color = TextLight,
+                        color = colors.textLight,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
@@ -187,11 +572,12 @@ fun TitleScreen(viewModel: GameViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(24.dp))
-                            .background(SlateCardBg)
-                            .border(1.dp, KeyPassiveBg.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
+                            .background(colors.cardBg)
+                            .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.5f), RoundedCornerShape(24.dp))
                             .padding(16.dp)
                     ) {
-                        if (highScoreRecord != null) {
+                        val record = highScoreRecord
+                        if (record != null) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -199,22 +585,22 @@ fun TitleScreen(viewModel: GameViewModel) {
                             ) {
                                 Column {
                                     Text(
-                                        text = "High Score: ${highScoreRecord!!.score}",
+                                        text = "${TranslationManager.getString("high_score_title", currentLanguage)}: ${record.score}",
                                         style = MaterialTheme.typography.headlineSmall.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold
                                         ),
-                                        color = AccentCyan
+                                        color = colors.accentCyan
                                     )
                                     Text(
-                                        text = "Max Combo: x${highScoreRecord!!.maxCombo}  |  Acc: %.1f%%".format(highScoreRecord!!.accuracy),
+                                        text = "${TranslationManager.getString("max_combo", currentLanguage)}: x${record.maxCombo}  |  ${TranslationManager.getString("accuracy", currentLanguage)}: %.1f%%".format(record.accuracy),
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = LightAccentText
+                                        color = colors.lightAccentText
                                     )
                                     Text(
-                                        text = "Perfects: ${highScoreRecord!!.perfectCount}  |  Misses: ${highScoreRecord!!.missCount}",
+                                        text = "${TranslationManager.getString("perfects", currentLanguage)}: ${record.perfectCount}  |  ${TranslationManager.getString("misses", currentLanguage)}: ${record.missCount}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = LightAccentText.copy(alpha = 0.8f)
+                                        color = colors.lightAccentText.copy(alpha = 0.8f)
                                     )
                                 }
 
@@ -223,12 +609,12 @@ fun TitleScreen(viewModel: GameViewModel) {
                                     modifier = Modifier
                                         .size(60.dp)
                                         .clip(CircleShape)
-                                        .background(KeyPassiveBg)
-                                        .border(2.dp, AccentPink, CircleShape),
+                                        .background(colors.keyPassiveBg)
+                                        .border(2.dp, colors.accentPink, CircleShape),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = highScoreRecord!!.rank,
+                                        text = record.rank,
                                         style = MaterialTheme.typography.headlineLarge.copy(
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.ExtraBold
@@ -247,14 +633,14 @@ fun TitleScreen(viewModel: GameViewModel) {
                                 Icon(
                                     imageVector = Icons.Default.Star,
                                     contentDescription = null,
-                                    tint = LightAccentText,
+                                    tint = colors.lightAccentText,
                                     modifier = Modifier.size(36.dp)
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "No beatmap score records found for this track.",
+                                    text = TranslationManager.getString("no_scores", currentLanguage),
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = LightAccentText,
+                                    color = colors.lightAccentText,
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -271,20 +657,20 @@ fun TitleScreen(viewModel: GameViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "RECENT PLAY HISTORIES",
+                            text = TranslationManager.getString("history", currentLanguage),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 1.5.sp
                             ),
-                            color = TextLight
+                            color = colors.textLight
                         )
                         
                         if (historyList.isNotEmpty()) {
                             Text(
-                                text = "CLEAR LOGS",
+                                text = TranslationManager.getString("clear_records", currentLanguage),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold,
-                                    color = AccentPink
+                                    color = colors.accentPink
                                 ),
                                 modifier = Modifier
                                     .clickable {
@@ -304,22 +690,22 @@ fun TitleScreen(viewModel: GameViewModel) {
                                 .fillMaxWidth()
                                 .height(120.dp)
                                 .clip(RoundedCornerShape(24.dp))
-                                .background(SlateCardBg)
-                                .border(1.dp, KeyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                                .background(colors.cardBg)
+                                .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                                 .padding(16.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No recent records. Play a song to save a historical entry!",
+                                text = TranslationManager.getString("no_scores", currentLanguage),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = LightAccentText,
+                                color = colors.lightAccentText,
                                 textAlign = TextAlign.Center
                             )
                         }
                     }
                 } else {
                     items(historyList) { record ->
-                        HistoryRow(record)
+                        HistoryRow(record, colors, currentLanguage)
                     }
                 }
             }
@@ -336,8 +722,8 @@ fun TitleScreen(viewModel: GameViewModel) {
                     .height(64.dp)
                     .testTag("start_game_button"),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = AccentLavender,
-                    contentColor = Color(0xFF381E72)
+                    containerColor = colors.accentLavender,
+                    contentColor = colors.bg
                 ),
                 shape = RoundedCornerShape(24.dp),
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
@@ -353,7 +739,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "START PLAYING",
+                        text = TranslationManager.getString("tap_to_play", currentLanguage),
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.ExtraBold,
                             letterSpacing = 2.sp,
@@ -370,16 +756,18 @@ fun TitleScreen(viewModel: GameViewModel) {
 fun SongCard(
     song: Song,
     isSelected: Boolean,
+    colors: ThemeColors,
+    currentLanguage: AppLanguage,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) AccentLavender else KeyPassiveBg.copy(alpha = 0.3f)
+    val borderColor = if (isSelected) colors.accentLavender else colors.keyPassiveBg.copy(alpha = 0.3f)
     val backgroundBrush = if (isSelected) {
         Brush.linearGradient(
-            colors = listOf(SlateCardBg, Color(0xFF381E72).copy(alpha = 0.15f))
+            colors = listOf(colors.cardBg, colors.accentLavender.copy(alpha = 0.12f))
         )
     } else {
         Brush.linearGradient(
-            colors = listOf(SlateCardBg, SlateCardBg)
+            colors = listOf(colors.cardBg, colors.cardBg)
         )
     }
 
@@ -405,13 +793,13 @@ fun SongCard(
                 modifier = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(if (isSelected) KeyPassiveBg else DeepSpaceBg),
+                    .background(if (isSelected) colors.keyPassiveBg else colors.bg),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = if (isSelected) Icons.Default.Star else Icons.Default.PlayArrow,
                     contentDescription = null,
-                    tint = if (isSelected) AccentLavender else LightAccentText
+                    tint = if (isSelected) colors.accentLavender else colors.lightAccentText
                 )
             }
 
@@ -424,7 +812,7 @@ fun SongCard(
                 Text(
                     text = song.name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = TextLight,
+                    color = colors.textLight,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -434,28 +822,34 @@ fun SongCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "BPM ${song.bpm}",
+                        text = "${TranslationManager.getString("bpm", currentLanguage)} ${song.bpm}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = LightAccentText
+                        color = colors.lightAccentText
                     )
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.bodySmall,
-                        color = LightAccentText
+                        color = colors.lightAccentText
                     )
                     Text(
-                        text = "Length 1:00",
+                        text = "${TranslationManager.getString("notes", currentLanguage)} ~${song.gameNotes.size}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = LightAccentText
+                        color = colors.lightAccentText
                     )
                 }
             }
 
             // Difficulty Badge Toggle
             val diffColor = when (song.difficulty) {
-                "Easy" -> AccentGreen
+                "Easy" -> colors.accentGreen
                 "Normal" -> Color(0xFFFFAA00)
-                else -> AccentPink
+                else -> colors.accentPink
+            }
+
+            val difficultyLabel = when (song.difficulty) {
+                "Easy" -> TranslationManager.getString("easy", currentLanguage)
+                "Normal" -> TranslationManager.getString("normal", currentLanguage)
+                else -> TranslationManager.getString("hard", currentLanguage)
             }
 
             Box(
@@ -466,7 +860,7 @@ fun SongCard(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Text(
-                    text = song.difficulty.uppercase(),
+                    text = difficultyLabel.uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 10.sp
@@ -479,22 +873,26 @@ fun SongCard(
 }
 
 @Composable
-fun HistoryRow(record: ScoreRecord) {
+fun HistoryRow(
+    record: ScoreRecord,
+    colors: ThemeColors,
+    currentLanguage: AppLanguage
+) {
     val fmt = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
     val dateStr = fmt.format(Date(record.timestamp))
 
     val diffColor = when (record.difficulty) {
-        "Easy" -> AccentGreen
+        "Easy" -> colors.accentGreen
         "Normal" -> Color(0xFFFFAA00)
-        else -> AccentPink
+        else -> colors.accentPink
     }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(SlateCardBg.copy(alpha = 0.6f))
-            .border(1.dp, KeyPassiveBg.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
+            .background(colors.cardBg.copy(alpha = 0.6f))
+            .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.15f), RoundedCornerShape(16.dp))
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -503,36 +901,41 @@ fun HistoryRow(record: ScoreRecord) {
             Text(
                 text = record.songName,
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = TextLight
+                color = colors.textLight
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                val difficultyLabel = when (record.difficulty) {
+                    "Easy" -> TranslationManager.getString("easy", currentLanguage)
+                    "Normal" -> TranslationManager.getString("normal", currentLanguage)
+                    else -> TranslationManager.getString("hard", currentLanguage)
+                }
                 Text(
-                    text = record.difficulty.uppercase(),
+                    text = difficultyLabel.uppercase(),
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
                     color = diffColor
                 )
                 Text(
                     text = "|",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LightAccentText.copy(alpha = 0.3f)
+                    color = colors.lightAccentText.copy(alpha = 0.3f)
                 )
                 Text(
                     text = "x${record.maxCombo} Combo",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LightAccentText
+                    color = colors.lightAccentText
                 )
                 Text(
                     text = "|",
                     style = MaterialTheme.typography.bodySmall,
-                    color = LightAccentText.copy(alpha = 0.3f)
+                    color = colors.lightAccentText.copy(alpha = 0.3f)
                 )
                 Text(
                     text = dateStr,
                     style = MaterialTheme.typography.bodySmall,
-                    color = LightAccentText.copy(alpha = 0.6f)
+                    color = colors.lightAccentText.copy(alpha = 0.6f)
                 )
             }
         }
@@ -544,7 +947,7 @@ fun HistoryRow(record: ScoreRecord) {
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold
                 ),
-                color = AccentCyan
+                color = colors.accentCyan
             )
             Text(
                 text = "GRADE ${record.rank}",
@@ -552,7 +955,7 @@ fun HistoryRow(record: ScoreRecord) {
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 10.sp
                 ),
-                color = AccentPink
+                color = colors.accentPink
             )
         }
     }
@@ -570,7 +973,10 @@ fun PlayScreen(viewModel: GameViewModel) {
     val health by viewModel.health.collectAsStateWithLifecycle()
     val accuracy by viewModel.accuracy.collectAsStateWithLifecycle()
     val selectedSong by viewModel.selectedSong.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
+    val activeTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
+    val colors = ThemeManager.getColors(activeTheme)
     val haptic = LocalHapticFeedback.current
 
     // Set constant target hit windows
@@ -578,7 +984,7 @@ fun PlayScreen(viewModel: GameViewModel) {
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = DeepSpaceBg
+        containerColor = colors.bg
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -593,6 +999,8 @@ fun PlayScreen(viewModel: GameViewModel) {
                 accuracy = accuracy,
                 health = health,
                 songProgress = (songTime.toFloat() / selectedSong.durationMs).coerceIn(0f, 1f),
+                colors = colors,
+                currentLanguage = currentLanguage,
                 onPauseClick = {
                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                     viewModel.exitToTitle()
@@ -620,7 +1028,7 @@ fun PlayScreen(viewModel: GameViewModel) {
                         
                         // Lane strip background
                         drawRect(
-                            color = if (i % 2 == 0) SlateCardBg.copy(alpha = 0.35f) else SlateCardBg.copy(alpha = 0.2f),
+                            color = if (i % 2 == 0) colors.cardBg.copy(alpha = 0.35f) else colors.cardBg.copy(alpha = 0.2f),
                             topLeft = Offset(startX, 0f),
                             size = Size(laneWidth, height)
                         )
@@ -628,7 +1036,7 @@ fun PlayScreen(viewModel: GameViewModel) {
                         // Outer separator borders
                         if (i > 0) {
                             drawLine(
-                                color = KeyPassiveBg.copy(alpha = 0.3f),
+                                color = colors.keyPassiveBg.copy(alpha = 0.3f),
                                 start = Offset(startX, 0f),
                                 end = Offset(startX, height),
                                 strokeWidth = 1.5f
@@ -655,20 +1063,20 @@ fun PlayScreen(viewModel: GameViewModel) {
                         size = Size(width, 30f)
                     )
 
-                    // 3. Draw fallback physical keys static targets (Letters DFJK inside translucent rings)
+                    // 3. Draw fallback physical targets (Letters DFJK inside translucent rings)
                     for (i in 0..3) {
                         val ringX = i * laneWidth + (laneWidth / 2f)
                         
                         // Rings at landing zone
                         drawCircle(
-                            color = if (i == 0 || i == 3) AccentLavender.copy(alpha = 0.3f) else AccentPink.copy(alpha = 0.3f),
-                            radius = 36f,
+                            color = if (i == 0 || i == 3) colors.accentLavender.copy(alpha = 0.35f) else colors.accentPink.copy(alpha = 0.35f),
+                            radius = 38f,
                             center = Offset(ringX, hitLineY),
-                            style = Stroke(width = 2f)
+                            style = Stroke(width = 3.5f)
                         )
                     }
 
-                    // 4. Draw descending Notes
+                    // 4. Draw descending Notes (EXTRA THICK & POPPING SIZES FOR POLISH)
                     // Render any notes whose hitTimeMs falls inside active window
                     viewModel.pcmNotes.forEach { note ->
                         if (note.isHit || note.judgment == "MISS") return@forEach
@@ -679,13 +1087,13 @@ fun PlayScreen(viewModel: GameViewModel) {
                         // Note is visible before collision and shortly after
                         if (progress in 0.0f..1.12f) {
                             val laneX = note.lane * laneWidth
-                            val xPadding = 8f
-                            val noteH = 42f
+                            val xPadding = 4f // Thin padding = maximum note thickness!
+                            val noteH = 75f   // Extreme BOLD depth & volume!
                             val noteColor = when (note.lane) {
-                                0 -> AccentLavender
-                                1 -> AccentCyan
-                                2 -> AccentPink
-                                else -> AccentLavender
+                                0 -> colors.accentLavender
+                                1 -> colors.accentCyan
+                                2 -> colors.accentPink
+                                else -> colors.accentGreen
                             }
 
                             drawRoundRect(
@@ -698,15 +1106,15 @@ fun PlayScreen(viewModel: GameViewModel) {
                                 ),
                                 topLeft = Offset(laneX + xPadding, noteY - noteH / 2f),
                                 size = Size(laneWidth - (xPadding * 2), noteH),
-                                cornerRadius = CornerRadius(14f, 14f)
+                                cornerRadius = CornerRadius(20f, 20f)
                             )
 
-                            // Bright neon reflective white core line
+                            // Bright neon reflective white core line (Highly visible thick core)
                             drawLine(
                                 color = Color.White.copy(alpha = 0.95f),
                                 start = Offset(laneX + xPadding + 10f, noteY),
                                 end = Offset(laneX + laneWidth - xPadding - 10f, noteY),
-                                strokeWidth = 4.5f
+                                strokeWidth = 9.0f // Thick 9f neon glow core!
                             )
                         }
                     }
@@ -728,10 +1136,10 @@ fun PlayScreen(viewModel: GameViewModel) {
                                         colors = listOf(
                                             Color.Transparent,
                                             when (i) {
-                                                0 -> AccentLavender.copy(alpha = alpha * 0.25f)
-                                                1 -> AccentCyan.copy(alpha = alpha * 0.25f)
-                                                2 -> AccentPink.copy(alpha = alpha * 0.25f)
-                                                else -> AccentLavender.copy(alpha = alpha * 0.25f)
+                                                0 -> colors.accentLavender.copy(alpha = alpha * 0.25f)
+                                                1 -> colors.accentCyan.copy(alpha = alpha * 0.25f)
+                                                2 -> colors.accentPink.copy(alpha = alpha * 0.25f)
+                                                else -> colors.accentGreen.copy(alpha = alpha * 0.25f)
                                             }
                                         ),
                                         startY = 100f
@@ -741,54 +1149,27 @@ fun PlayScreen(viewModel: GameViewModel) {
                     }
                 }
 
-                // 6. Floating Judgments Text & Combo overlay
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.Center)
-                        .padding(bottom = 60.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    if (combo > 2) {
-                        Text(
-                            text = "$combo",
-                            style = MaterialTheme.typography.displayMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                letterSpacing = 2.sp
-                            ),
-                            color = Color.White
-                        )
-                        Text(
-                            text = "COMBO",
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                letterSpacing = 4.sp
-                            ),
-                            color = AccentLavender
-                        )
-                    }
-                }
-
-                // Rising Floating Judgment Feedbacks
+                // 6. Floating feedback popups (Perfect / Great / Miss / etc.)
                 viewModel.floatingFeedbacks.forEach { feedback ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .fillMaxHeight(0.85f)
-                    ) {
+                    val localizedText = when (feedback.text.uppercase()) {
+                        "PERFECT" -> TranslationManager.getString("perfect", currentLanguage)
+                        "GREAT" -> TranslationManager.getString("great", currentLanguage)
+                        "GOOD" -> TranslationManager.getString("good", currentLanguage)
+                        "MISS" -> TranslationManager.getString("miss", currentLanguage)
+                        else -> feedback.text
+                    }
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val perLaneWidth = maxWidth / 4
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth(0.25f)
+                                .width(perLaneWidth)
                                 .align(Alignment.BottomStart)
-                                .offset(
-                                    x = (feedback.lane * 90).dp
-                                )
-                                .padding(bottom = 120.dp),
+                                .offset(x = perLaneWidth * feedback.lane)
+                                .padding(bottom = 140.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = feedback.text,
+                                text = localizedText,
                                 style = MaterialTheme.typography.titleMedium.copy(
                                     fontWeight = FontWeight.ExtraBold,
                                     fontFamily = FontFamily.Monospace
@@ -800,7 +1181,35 @@ fun PlayScreen(viewModel: GameViewModel) {
                     }
                 }
 
-                // Invisible Lane Touch Receptors for flexible mobile tapping anywhere on lanes
+                // 7. Combo overlay in middle of playing screen
+                if (combo > 0) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.Center)
+                            .padding(bottom = 60.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "$combo",
+                            style = MaterialTheme.typography.displayMedium.copy(
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = Color.White
+                        )
+                        Text(
+                            text = "COMBO",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                letterSpacing = 3.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            ),
+                            color = colors.lightAccentText
+                        )
+                    }
+                }
+
+                // 8. Invisible Lane Touch Receptors for flexible mobile tapping anywhere on lanes
                 Row(
                     modifier = Modifier.fillMaxSize()
                 ) {
@@ -819,137 +1228,133 @@ fun PlayScreen(viewModel: GameViewModel) {
                         )
                     }
                 }
-            }
 
-            // 3. Bottom persistent controls deck (New design addition matching user's spec exactly)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(SlateCardBg, shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                    .padding(horizontal = 16.dp, vertical = 16.dp)
-                    .padding(bottom = 8.dp)
-            ) {
-                 Row(
-                     modifier = Modifier.fillMaxWidth(),
-                     horizontalArrangement = Arrangement.spacedBy(12.dp)
-                 ) {
-                     for (i in 0..3) {
-                         val keyTag = when (i) {
-                             0 -> "D"
-                             1 -> "F"
-                             2 -> "J"
-                             else -> "K"
-                         }
-                         
-                         val lastTap = viewModel.laneFlashTime[i]
-                         val diff = songTime - lastTap
-                         val isActive = diff < 150
-                         
-                         val keyBgColor = if (isActive) {
-                             when (i) {
-                                 0 -> AccentLavender
-                                 1 -> AccentCyan
-                                 2 -> AccentPink
-                                 else -> AccentLavender
-                             }
-                         } else {
-                             KeyPassiveBg
-                         }
+                // 9. Bottom tactile controls deck keys layout overlay (Touch target sizes >= 48dp)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .background(colors.cardBg, shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .padding(bottom = 8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        for (i in 0..3) {
+                            val keyTag = when (i) {
+                                0 -> "D"
+                                1 -> "F"
+                                2 -> "J"
+                                else -> "K"
+                            }
+                            
+                            val lastTap = viewModel.laneFlashTime[i]
+                            val diff = songTime - lastTap
+                            val isActive = diff < 150
+                            
+                            val keyBgColor = if (isActive) {
+                                when (i) {
+                                    0 -> colors.accentLavender
+                                    1 -> colors.accentCyan
+                                    2 -> colors.accentPink
+                                    else -> colors.accentLavender
+                                }
+                            } else {
+                                colors.keyPassiveBg
+                            }
 
-                         val keyTextColor = if (isActive) {
-                             when (i) {
-                                 0 -> Color(0xFF381E72)
-                                 1 -> Color(0xFF01579B)
-                                 2 -> Color(0xFF381E72)
-                                 else -> Color(0xFF381E72)
-                             }
-                         } else {
-                             Color.White
-                         }
+                            val keyTextColor = if (isActive) {
+                                Color(0xFF131118)
+                            } else {
+                                colors.textLight
+                            }
 
-                         val borderModifier = if (i == 2 && !isActive) {
-                             Modifier.border(2.dp, AccentLavender.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                         } else Modifier
+                            val borderModifier = if (i == 2 && !isActive) {
+                                Modifier.border(2.dp, colors.accentLavender.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                            } else Modifier
 
-                         Box(
-                             modifier = Modifier
-                                 .weight(1f)
-                                 .aspectRatio(1f)
-                                 .clip(RoundedCornerShape(20.dp))
-                                 .background(keyBgColor)
-                                 .then(borderModifier)
-                                 .pointerInput(Unit) {
-                                     detectTapGestures(
-                                         onPress = {
-                                             viewModel.registerLaneTap(i)
-                                         }
-                                     )
-                                 },
-                             contentAlignment = Alignment.Center
-                         ) {
-                             Text(
-                                 text = keyTag,
-                                 style = MaterialTheme.typography.headlineMedium.copy(
-                                     fontSize = 24.sp,
-                                     fontWeight = FontWeight.Bold,
-                                     fontFamily = FontFamily.Monospace
-                                 ),
-                                 color = keyTextColor
-                             )
-                         }
-                     }
-                 }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(keyBgColor)
+                                    .then(borderModifier)
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onPress = {
+                                                viewModel.registerLaneTap(i)
+                                            }
+                                        )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = keyTag,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = keyTextColor
+                                )
+                            }
+                        }
+                    }
 
-                 Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                 Row(
-                     modifier = Modifier.fillMaxWidth(),
-                     horizontalArrangement = Arrangement.SpaceBetween,
-                     verticalAlignment = Alignment.CenterVertically
-                 ) {
-                     Row(
-                         verticalAlignment = Alignment.CenterVertically,
-                         horizontalArrangement = Arrangement.spacedBy(6.dp)
-                     ) {
-                         Box(
-                             modifier = Modifier
-                                 .size(8.dp)
-                                 .clip(CircleShape)
-                                 .background(Color(0xFF4CAF50))
-                         )
-                         Text(
-                             text = "STABLE 60FPS",
-                             style = MaterialTheme.typography.labelSmall.copy(
-                                 fontSize = 10.sp,
-                                 fontWeight = FontWeight.Bold,
-                                 letterSpacing = 0.5.sp
-                             ),
-                             color = LightAccentText
-                         )
-                     }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.accentGreen)
+                            )
+                            Text(
+                                text = "STABLE 60FPS",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                color = colors.lightAccentText
+                            )
+                        }
 
-                     Button(
-                         onClick = {
-                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                             viewModel.exitToTitle()
-                         },
-                         colors = ButtonDefaults.buttonColors(
-                             containerColor = Color(0xFF381E72),
-                             contentColor = AccentLavender
-                         ),
-                         shape = RoundedCornerShape(50),
-                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                         modifier = Modifier.height(34.dp)
-                     ) {
-                         Text(
-                             text = "PAUSE",
-                             style = MaterialTheme.typography.labelSmall.copy(
-                                 fontWeight = FontWeight.Bold,
-                                 fontSize = 11.sp
-                             )
-                         )
-                     }
-                 }
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                viewModel.exitToTitle()
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.accentLavender
+                            ),
+                            shape = RoundedCornerShape(50),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text(
+                                text = TranslationManager.getString("cancel", currentLanguage).uppercase(),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
     }
@@ -963,12 +1368,14 @@ fun HUDPanel(
     accuracy: Float,
     health: Float,
     songProgress: Float,
+    colors: ThemeColors,
+    currentLanguage: AppLanguage,
     onPauseClick: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(SlateCardBg)
+            .background(colors.cardBg)
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
@@ -985,7 +1392,7 @@ fun HUDPanel(
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 2.sp
                     ),
-                    color = AccentLavender
+                    color = colors.accentLavender
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
@@ -1018,18 +1425,18 @@ fun HUDPanel(
                     Text(
                         text = "Acc: %.1f%%".format(accuracy),
                         style = MaterialTheme.typography.labelSmall,
-                        color = LightAccentText
+                        color = colors.lightAccentText
                     )
                     Text(
                         text = "•",
                         style = MaterialTheme.typography.labelSmall,
-                        color = LightAccentText
+                        color = colors.lightAccentText
                     )
                     Text(
                         text = "VITALITY: ${(health * 100).toInt()}%",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = AccentLavender
+                            color = colors.accentLavender
                         )
                     )
                 }
@@ -1048,7 +1455,7 @@ fun HUDPanel(
                     .weight(1f)
                     .height(4.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(KeyPassiveBg)
+                    .background(colors.keyPassiveBg)
             ) {
                 Box(
                     modifier = Modifier
@@ -1057,7 +1464,7 @@ fun HUDPanel(
                         .clip(RoundedCornerShape(2.dp))
                         .background(
                             brush = Brush.horizontalGradient(
-                                colors = listOf(AccentLavender, AccentCyan)
+                                colors = listOf(colors.accentLavender, colors.accentCyan)
                             )
                         )
                 )
@@ -1071,7 +1478,7 @@ fun HUDPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(2.dp),
-            color = AccentLavender,
+            color = colors.accentLavender,
             trackColor = Color.Transparent,
         )
     }
@@ -1090,7 +1497,10 @@ fun ResultsScreen(viewModel: GameViewModel) {
     val goods by viewModel.goodCount.collectAsStateWithLifecycle()
     val misses by viewModel.missCount.collectAsStateWithLifecycle()
     val selectedSong by viewModel.selectedSong.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
+    val activeTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
+    val colors = ThemeManager.getColors(activeTheme)
     val rank = viewModel.calculateFinalRank()
     val haptic = LocalHapticFeedback.current
 
@@ -1098,7 +1508,7 @@ fun ResultsScreen(viewModel: GameViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing),
-        containerColor = DeepSpaceBg
+        containerColor = colors.bg
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -1111,34 +1521,34 @@ fun ResultsScreen(viewModel: GameViewModel) {
             // Header Title
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = "STAGE CLEAR",
+                    text = TranslationManager.getString("results", currentLanguage),
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 4.sp
                     ),
-                    color = AccentLavender
+                    color = colors.accentLavender
                 )
                 Text(
                     text = selectedSong.name.uppercase(),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = TextLight
+                    color = colors.textLight
                 )
             }
 
             // Rank Badge Circle
             val rankGlowColor = when (rank) {
-                "S" -> AccentLavender
-                "A" -> AccentCyan
-                "B" -> Color(0xFFC5E1A5)
+                "S" -> colors.accentLavender
+                "A" -> colors.accentCyan
+                "B" -> colors.accentGreen
                 "C" -> Color(0xFFFFCC80)
-                else -> AccentPink
+                else -> colors.accentPink
             }
             Box(
                 modifier = Modifier
                     .size(130.dp)
                     .clip(CircleShape)
-                    .background(SlateCardBg)
+                    .background(colors.cardBg)
                     .border(2.dp, rankGlowColor, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
@@ -1158,29 +1568,29 @@ fun ResultsScreen(viewModel: GameViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(SlateCardBg)
-                    .border(1.dp, KeyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .background(colors.cardBg)
+                    .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                ResultMetricRow("Total Score", "$score pts", AccentCyan)
-                ResultMetricRow("Accuracy", "%.2f%%".format(accuracy), AccentLavender)
-                ResultMetricRow("Max Combo", "x$maxCombo Hits", Color.White)
+                ResultMetricRow(TranslationManager.getString("total_score", currentLanguage), "$score pts", colors.accentCyan, colors)
+                ResultMetricRow(TranslationManager.getString("accuracy", currentLanguage), "%.2f%%".format(accuracy), colors.accentLavender, colors)
+                ResultMetricRow(TranslationManager.getString("max_combo", currentLanguage), "x$maxCombo Hits", Color.White, colors)
                 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(KeyPassiveBg.copy(alpha = 0.3f))
+                        .background(colors.keyPassiveBg.copy(alpha = 0.3f))
                 )
 
-                ResultMetricRow("Perfect", "$perfects", AccentLavender)
-                ResultMetricRow("Great", "$greats", AccentCyan)
-                ResultMetricRow("Good", "$goods", Color(0xFFFFCC80))
-                ResultMetricRow("Miss", "$misses", AccentPink)
+                ResultMetricRow(TranslationManager.getString("perfects", currentLanguage), "$perfects", colors.accentLavender, colors)
+                ResultMetricRow(TranslationManager.getString("greats", currentLanguage), "$greats", colors.accentCyan, colors)
+                ResultMetricRow(TranslationManager.getString("goods", currentLanguage), "$goods", Color(0xFFFFCC80), colors)
+                ResultMetricRow(TranslationManager.getString("misses", currentLanguage), "$misses", colors.accentPink, colors)
             }
 
-            // Actions Buttons Row
+            // Actions Buttons Row (Touch targets >= 48dp)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1193,11 +1603,11 @@ fun ResultsScreen(viewModel: GameViewModel) {
                     modifier = Modifier
                         .weight(1f)
                         .height(58.dp),
-                    border = BorderStroke(1.dp, KeyPassiveBg),
+                    border = BorderStroke(1.dp, colors.keyPassiveBg),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     shape = RoundedCornerShape(24.dp)
                 ) {
-                    Text(text = "BACK TO TITLE", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(text = TranslationManager.getString("exit", currentLanguage), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                 }
 
                 Button(
@@ -1209,10 +1619,10 @@ fun ResultsScreen(viewModel: GameViewModel) {
                         .weight(1f)
                         .height(58.dp)
                         .testTag("replay_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentLavender, contentColor = Color(0xFF381E72)),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentLavender, contentColor = colors.bg),
                     shape = RoundedCornerShape(24.dp)
                 ) {
-                    Text(text = "REPLAY SONG", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(text = TranslationManager.getString("retry", currentLanguage), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                 }
             }
         }
@@ -1220,13 +1630,13 @@ fun ResultsScreen(viewModel: GameViewModel) {
 }
 
 @Composable
-fun ResultMetricRow(label: String, value: String, valueColor: Color) {
+fun ResultMetricRow(label: String, value: String, valueColor: Color, colors: ThemeColors) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = LightAccentText)
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = colors.lightAccentText)
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium.copy(
@@ -1246,14 +1656,17 @@ fun FailedScreen(viewModel: GameViewModel) {
     val score by viewModel.score.collectAsStateWithLifecycle()
     val maxCombo by viewModel.maxCombo.collectAsStateWithLifecycle()
     val selectedSong by viewModel.selectedSong.collectAsStateWithLifecycle()
+    val currentLanguage by viewModel.currentLanguage.collectAsStateWithLifecycle()
+    val activeTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
     
+    val colors = ThemeManager.getColors(activeTheme)
     val haptic = LocalHapticFeedback.current
 
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.safeDrawing),
-        containerColor = DeepSpaceBg
+        containerColor = colors.bg
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -1267,23 +1680,23 @@ fun FailedScreen(viewModel: GameViewModel) {
                 Icon(
                     imageVector = Icons.Default.Warning,
                     contentDescription = null,
-                    tint = AccentPink,
+                    tint = colors.accentPink,
                     modifier = Modifier.size(72.dp)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "VITALITY DELETED",
+                    text = TranslationManager.getString("failed", currentLanguage),
                     style = MaterialTheme.typography.headlineLarge.copy(
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 3.sp
                     ),
-                    color = AccentPink
+                    color = colors.accentPink
                 )
                 Text(
-                    text = "STAGES ATTEMPT FAILED",
+                    text = "VITALITY DELETED",
                     style = MaterialTheme.typography.labelLarge.copy(letterSpacing = 2.sp),
-                    color = LightAccentText
+                    color = colors.lightAccentText
                 )
             }
 
@@ -1291,21 +1704,28 @@ fun FailedScreen(viewModel: GameViewModel) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(24.dp))
-                    .background(SlateCardBg)
-                    .border(1.dp, KeyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
+                    .background(colors.cardBg)
+                    .border(1.dp, colors.keyPassiveBg.copy(alpha = 0.3f), RoundedCornerShape(24.dp))
                     .padding(20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = selectedSong.name,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = TextLight
+                    color = colors.textLight
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                
+                val difficultyLabel = when (selectedSong.difficulty) {
+                    "Easy" -> TranslationManager.getString("easy", currentLanguage)
+                    "Normal" -> TranslationManager.getString("normal", currentLanguage)
+                    else -> TranslationManager.getString("hard", currentLanguage)
+                }
+
                 Text(
-                    text = "Difficulty: ${selectedSong.difficulty.uppercase()}",
+                    text = "${TranslationManager.getString("select_diff", currentLanguage)}: ${difficultyLabel.uppercase()}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = AccentPink
+                    color = colors.accentPink
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1313,7 +1733,7 @@ fun FailedScreen(viewModel: GameViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(1.dp)
-                        .background(KeyPassiveBg.copy(alpha = 0.3f))
+                        .background(colors.keyPassiveBg.copy(alpha = 0.3f))
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -1322,19 +1742,19 @@ fun FailedScreen(viewModel: GameViewModel) {
                     horizontalArrangement = Arrangement.SpaceAround
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "Final Score", style = MaterialTheme.typography.bodySmall, color = LightAccentText)
+                        Text(text = TranslationManager.getString("total_score", currentLanguage), style = MaterialTheme.typography.bodySmall, color = colors.lightAccentText)
                         Text(
                             text = "$score",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
                             ),
-                            color = AccentCyan
+                            color = colors.accentCyan
                         )
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "Max Combo", style = MaterialTheme.typography.bodySmall, color = LightAccentText)
+                        Text(text = TranslationManager.getString("max_combo", currentLanguage), style = MaterialTheme.typography.bodySmall, color = colors.lightAccentText)
                         Text(
                             text = "x$maxCombo",
                             style = MaterialTheme.typography.titleLarge.copy(
@@ -1347,6 +1767,7 @@ fun FailedScreen(viewModel: GameViewModel) {
                 }
             }
 
+            // Touch Targets >= 48dp
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
@@ -1359,11 +1780,11 @@ fun FailedScreen(viewModel: GameViewModel) {
                     modifier = Modifier
                         .weight(1f)
                         .height(58.dp),
-                    border = BorderStroke(1.dp, KeyPassiveBg),
+                    border = BorderStroke(1.dp, colors.keyPassiveBg),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
                     shape = RoundedCornerShape(24.dp)
                 ) {
-                    Text(text = "EXIT MENU", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(text = TranslationManager.getString("exit", currentLanguage), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                 }
 
                 Button(
@@ -1375,10 +1796,10 @@ fun FailedScreen(viewModel: GameViewModel) {
                         .weight(1f)
                         .height(58.dp)
                         .testTag("retry_button"),
-                    colors = ButtonDefaults.buttonColors(containerColor = AccentPink, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = colors.accentPink, contentColor = Color.White),
                     shape = RoundedCornerShape(24.dp)
                 ) {
-                    Text(text = "TRY AGAIN", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
+                    Text(text = TranslationManager.getString("retry", currentLanguage), style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold))
                 }
             }
         }

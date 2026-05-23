@@ -20,10 +20,48 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 
+enum class AppTheme(val id: String, val displayName: String) {
+    DEEP_SPACE("deep_space", "Deep Space"),
+    CYBERPUNK("cyberpunk", "Cyberpunk"),
+    CHERRY_BLOSSOM("cherry_blossom", "Cherry Blossom"),
+    RETRO_EMERALD("retro_emerald", "Retro Emerald"),
+    MONOCHROME("monochrome", "Monochrome")
+}
+
+enum class AppLanguage(val id: String, val displayName: String) {
+    EN("en", "English"),
+    ES("es", "Español"),
+    PT("pt", "Português"),
+    JA("ja", "日本語"),
+    DE("de", "Deutsch")
+}
+
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val scoreRepository: ScoreRepository
     val allScores: StateFlow<List<ScoreRecord>>
+
+    private val prefs = application.getSharedPreferences("dfjk_rhythm_prefs", android.content.Context.MODE_PRIVATE)
+
+    private val _currentTheme = MutableStateFlow(
+        AppTheme.values().firstOrNull { it.id == prefs.getString("theme", "deep_space") } ?: AppTheme.DEEP_SPACE
+    )
+    val currentTheme: StateFlow<AppTheme> = _currentTheme.asStateFlow()
+
+    private val _currentLanguage = MutableStateFlow(
+        AppLanguage.values().firstOrNull { it.id == prefs.getString("language", "en") } ?: AppLanguage.EN
+    )
+    val currentLanguage: StateFlow<AppLanguage> = _currentLanguage.asStateFlow()
+
+    fun changeTheme(theme: AppTheme) {
+        _currentTheme.value = theme
+        prefs.edit().putString("theme", theme.id).apply()
+    }
+
+    fun changeLanguage(language: AppLanguage) {
+        _currentLanguage.value = language
+        prefs.edit().putString("language", language.id).apply()
+    }
 
     init {
         val database = RhythmDatabase.getDatabase(application)
@@ -301,6 +339,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun terminateGameOver() {
+        if (_gameState.value != GameState.PLAYING) return
         _gameState.value = GameState.FAILED
         gameLoopJob?.cancel()
         gameLoopJob = null
@@ -317,6 +356,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun endGameSuccess() {
+        if (_gameState.value != GameState.PLAYING) return
         _gameState.value = GameState.RESULTS
         gameLoopJob?.cancel()
         gameLoopJob = null
@@ -361,9 +401,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 accuracy = acc
             )
             scoreRepository.saveScore(record)
-            withContext(Dispatchers.Main) {
-                observeHighScoreForSelectedSong()
-            }
         }
     }
 
@@ -394,9 +431,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun clearAllHighScores() {
         viewModelScope.launch(Dispatchers.IO) {
             scoreRepository.clearScores()
-            withContext(Dispatchers.Main) {
-                observeHighScoreForSelectedSong()
-            }
         }
     }
 

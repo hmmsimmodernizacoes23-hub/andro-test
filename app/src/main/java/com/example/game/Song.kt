@@ -35,8 +35,11 @@ class Song(
         fun createPresetSongs(): List<Song> {
             return listOf(
                 generateProceduralSong("NEON HORIZON", 120, "Easy"),
-                generateProceduralSong("VOLTAGE SURGE", 140, "Normal"),
-                generateProceduralSong("INFINITY OVERRIDE", 165, "Hard")
+                generateProceduralSong("STARDUST GALLOP", 135, "Easy"),
+                generateProceduralSong("VOLTAGE SURGE", 145, "Normal"),
+                generateProceduralSong("GLITCHED MEMORIES", 152, "Normal"),
+                generateProceduralSong("INFINITY OVERRIDE", 172, "Hard"),
+                generateProceduralSong("COSMIC REVOLUTION", 185, "Hard")
             )
         }
 
@@ -49,7 +52,7 @@ class Song(
             val gameEvents = mutableListOf<GameNoteEvent>()
             var gameNoteId = 0
 
-            // 1. CHORDS, SCALES and SOUND WAVES based on Song/Difficulty
+            // 1. CHORDS, SCALES and SOUND WAVES based on Song Name
             val chords: List<List<Int>>
             val bassScale: DoubleArray
             val melodyScale: DoubleArray
@@ -58,59 +61,89 @@ class Song(
             val bassVolume: Float
             val melodyVolume: Float
 
-            when (difficulty) {
-                "Easy" -> { // NEON HORIZON - Cyberpunk Synthwave Vibe (G Major/E Minor)
-                    // Scales (Warm & uplifting G Major/E Minor Pentatonic)
+            when (name) {
+                "NEON HORIZON" -> { // Cozy, warm 80s Outrun (Em -> C -> G -> D)
                     bassScale = doubleArrayOf(41.20, 49.00, 55.00, 61.74, 73.42, 82.41, 98.00, 110.00)
                     melodyScale = doubleArrayOf(164.81, 196.00, 220.00, 246.94, 293.66, 329.63, 392.00, 440.00, 493.88, 587.33, 659.25, 783.99)
-                    
-                    // Progressive dreamy progression (Em -> C -> G -> D)
                     chords = listOf(
-                        listOf(0, 2, 4), // E, B, E2
-                        listOf(1, 4, 6), // G, D, G2
-                        listOf(2, 5, 7), // A, E2, A2
-                        listOf(3, 5, 6)  // B, E2, G2
+                        listOf(0, 2, 4), // Em
+                        listOf(1, 4, 6), // C
+                        listOf(2, 5, 7), // G
+                        listOf(3, 5, 6)  // D
                     )
-                    
-                    bassWave = AudioEngine.WaveType.TRIANGLE // Smooth warm triangle bass
-                    melodyWave = AudioEngine.WaveType.SINE     // Liquid sine melody
+                    bassWave = AudioEngine.WaveType.TRIANGLE
+                    melodyWave = AudioEngine.WaveType.SINE
                     bassVolume = 0.16f
                     melodyVolume = 0.14f
                 }
-                "Normal" -> { // VOLTAGE SURGE - Energetic electro chiptune (A Minor / Dorian)
-                    // Scales (Mysterious, punchy A Minor/Dorian)
+                "STARDUST GALLOP" -> { // Uplifting Major Key (F Major -> Bb -> C -> Dm)
+                    bassScale = doubleArrayOf(43.65, 51.91, 58.27, 65.41, 73.42, 87.31, 98.00, 116.54)
+                    melodyScale = doubleArrayOf(174.61, 207.65, 233.08, 261.63, 293.66, 349.23, 392.00, 466.16, 523.25, 587.33, 698.46, 783.99)
+                    chords = listOf(
+                        listOf(0, 3, 5), // F Major
+                        listOf(2, 4, 7), // Bb Major
+                        listOf(3, 5, 0), // C Major
+                        listOf(4, 1, 6)  // D Minor
+                    )
+                    bassWave = AudioEngine.WaveType.SINE
+                    melodyWave = AudioEngine.WaveType.TRIANGLE
+                    bassVolume = 0.18f
+                    melodyVolume = 0.13f
+                }
+                "VOLTAGE SURGE" -> { // High energy retro house tracker (Am -> F -> G -> Em)
                     bassScale = doubleArrayOf(55.00, 65.41, 73.42, 82.41, 98.00, 110.00, 130.81, 146.83)
                     melodyScale = doubleArrayOf(220.00, 261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33, 659.25, 783.99, 880.00)
-                    
-                    // Driving energetic chord progression (Am -> F -> Dm -> Em)
                     chords = listOf(
-                        listOf(0, 2, 5), // A, D, A2
-                        listOf(1, 3, 6), // C, G, C2
-                        listOf(2, 4, 7), // D, A, D2
-                        listOf(3, 4, 5)  // E, A, A2
+                        listOf(0, 2, 5), // Am
+                        listOf(1, 3, 6), // F
+                        listOf(2, 4, 7), // G
+                        listOf(3, 4, 5)  // Em
                     )
-                    
-                    bassWave = AudioEngine.WaveType.SAWTOOTH // Buzzing punchy bass
-                    melodyWave = AudioEngine.WaveType.SQUARE    // Crispy classic chip-melody
-                    bassVolume = 0.11f
+                    bassWave = AudioEngine.WaveType.SAWTOOTH
+                    melodyWave = AudioEngine.WaveType.SQUARE
+                    bassVolume = 0.12f
                     melodyVolume = 0.08f
                 }
-                else -> { // INFINITY OVERRIDE - Phrygian Supersaw/Drum-and-Bass speed metal
-                    // Scales (Dark, technical, high-voltage Phrygian)
+                "GLITCHED MEMORIES" -> { // Somber, beautiful lofi/glitch (Fm -> Db -> Ab -> Eb)
+                    bassScale = doubleArrayOf(43.65, 48.99, 58.27, 65.41, 69.30, 87.31, 97.99, 110.00)
+                    melodyScale = doubleArrayOf(174.61, 195.99, 233.08, 261.63, 277.18, 349.23, 391.99, 440.00, 523.25, 554.37, 698.46, 783.99)
+                    chords = listOf(
+                        listOf(0, 2, 4), // Fm
+                        listOf(1, 3, 5), // Db
+                        listOf(2, 4, 6), // Ab
+                        listOf(3, 1, 5)  // Eb
+                    )
+                    bassWave = AudioEngine.WaveType.TRIANGLE
+                    melodyWave = AudioEngine.WaveType.SINE
+                    bassVolume = 0.14f
+                    melodyVolume = 0.10f
+                }
+                "INFINITY OVERRIDE" -> { // Superfast Technical Phrygian DnB
                     bassScale = doubleArrayOf(46.25, 49.00, 61.74, 69.30, 73.42, 82.41, 92.50)
                     melodyScale = doubleArrayOf(185.00, 196.00, 246.94, 277.18, 293.66, 329.63, 369.99, 392.00, 493.88, 554.37, 587.33, 659.25, 739.99)
-                    
-                    // Dramatic tense progression (F#m -> G -> D#dim -> C#)
                     chords = listOf(
-                        listOf(0, 1, 4), // F#, G, D
-                        listOf(1, 3, 5), // G, C#, E
-                        listOf(2, 4, 6), // B, D, F#
-                        listOf(3, 5, 0)  // C#, E, F#
+                        listOf(0, 1, 4), // F#m-G
+                        listOf(1, 3, 5),
+                        listOf(2, 4, 6),
+                        listOf(3, 5, 0)
                     )
-                    
-                    bassWave = AudioEngine.WaveType.SQUARE   // Brutal thick square bass
-                    melodyWave = AudioEngine.WaveType.SAWTOOTH // Supersonic laser supersaw
+                    bassWave = AudioEngine.WaveType.SQUARE
+                    melodyWave = AudioEngine.WaveType.SAWTOOTH
                     bassVolume = 0.10f
+                    melodyVolume = 0.06f
+                }
+                else -> { // COSMIC REVOLUTION - Boss metal theme at 185 BPM! (Bm -> G -> A -> F#m)
+                    bassScale = doubleArrayOf(49.00, 55.00, 58.27, 65.41, 73.42, 82.41, 98.00)
+                    melodyScale = doubleArrayOf(246.94, 277.18, 293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 554.37, 587.33, 659.25, 739.99, 880.00)
+                    chords = listOf(
+                        listOf(0, 2, 4),
+                        listOf(1, 3, 5),
+                        listOf(2, 4, 0),
+                        listOf(3, 2, 5)
+                    )
+                    bassWave = AudioEngine.WaveType.SAWTOOTH
+                    melodyWave = AudioEngine.WaveType.SAWTOOTH
+                    bassVolume = 0.09f
                     melodyVolume = 0.06f
                 }
             }
@@ -127,9 +160,8 @@ class Song(
                 // --- 1. SYNTHESIZE AUDIO TRACK (Backing track style varies by song) ---
                 
                 // Track A: DRUMS
-                when (difficulty) {
-                    "Easy" -> { // NEON HORIZON: Smooth synthwave beat
-                        // Gentle Kick on step 0 and 8 only (Half-time tempo groove, very chill)
+                when (name) {
+                    "NEON HORIZON" -> { // Smooth lounge synthwave beat
                         if (stepInBar == 0 || stepInBar == 8) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -142,7 +174,6 @@ class Song(
                                 )
                             )
                         }
-                        // Soft noise hi-hat on every 4th step (steps 4, 12)
                         if (stepInBar == 4 || stepInBar == 12) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -155,8 +186,32 @@ class Song(
                             )
                         }
                     }
-                    "Normal" -> { // VOLTAGE SURGE: Classic four-on-the-floor house
-                        // Kick on 0, 4, 8, 12
+                    "STARDUST GALLOP" -> { // Cozy, happy galloping classic chip drums
+                        if (stepInBar == 0 || stepInBar == 6 || stepInBar == 8 || stepInBar == 14) {
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 120.0,
+                                    type = AudioEngine.WaveType.SINE,
+                                    durationMs = 110,
+                                    volume = 0.18f,
+                                    pitchSlide = -400.0 // Snappy kick
+                                )
+                            )
+                        }
+                        if (stepInBar % 4 == 2) { // Upbeat hat
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 1000.0,
+                                    type = AudioEngine.WaveType.NOISE,
+                                    durationMs = 35,
+                                    volume = 0.05f
+                                )
+                            )
+                        }
+                    }
+                    "VOLTAGE SURGE" -> { // Four-on-the-floor driving house
                         if (stepInBar % 4 == 0) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -165,11 +220,10 @@ class Song(
                                     type = AudioEngine.WaveType.SINE,
                                     durationMs = 130,
                                     volume = 0.22f,
-                                    pitchSlide = -750.0 // crisp punchy transient
+                                    pitchSlide = -750.0 // punchy kick
                                 )
                             )
                         }
-                        // Snare on 4, 12
                         if (stepInBar == 4 || stepInBar == 12) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -181,7 +235,6 @@ class Song(
                                 )
                             )
                         }
-                        // Upbeat Hi-Hats on 2, 6, 10, 14 (Creates energy/groove)
                         if (stepInBar % 4 == 2) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -194,8 +247,43 @@ class Song(
                             )
                         }
                     }
-                    else -> { // INFINITY OVERRIDE: Fast, intense Chiptune Breakcore/DnB
-                        // Fast asymmetric DnB kick: step 0, 3, 8, 11
+                    "GLITCHED MEMORIES" -> { // Somber lofi syncopated beats
+                        if (stepInBar == 0 || stepInBar == 10) {
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 95.0,
+                                    type = AudioEngine.WaveType.SINE,
+                                    durationMs = 140,
+                                    volume = 0.16f,
+                                    pitchSlide = -300.0
+                                )
+                            )
+                        }
+                        if (stepInBar == 4 || stepInBar == 12) {
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 300.0,
+                                    type = AudioEngine.WaveType.NOISE,
+                                    durationMs = 60,
+                                    volume = 0.10f
+                                )
+                            )
+                        }
+                        if (stepInBar % 8 == 6) { // soft high beep glitch
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 1800.0,
+                                    type = AudioEngine.WaveType.SINE,
+                                    durationMs = 15,
+                                    volume = 0.03f
+                                )
+                            )
+                        }
+                    }
+                    "INFINITY OVERRIDE" -> { // Fast asymmetric Breakcore/DnB
                         if (stepInBar == 0 || stepInBar == 3 || stepInBar == 8 || stepInBar == 11) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -204,11 +292,10 @@ class Song(
                                     type = AudioEngine.WaveType.SINE,
                                     durationMs = 100,
                                     volume = 0.24f,
-                                    pitchSlide = -950.0 // ultra snappy laser drop
+                                    pitchSlide = -950.0
                                 )
                             )
                         }
-                        // Rapid snare hits (Heavy breakbeat): 4, 12, 14
                         if (stepInBar == 4 || stepInBar == 12 || stepInBar == 14) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -220,7 +307,6 @@ class Song(
                                 )
                             )
                         }
-                        // High speed double-time hats on every odd step
                         if (stepInBar % 2 != 0) {
                             synthEvents.add(
                                 SynthNoteEvent(
@@ -229,6 +315,42 @@ class Song(
                                     type = AudioEngine.WaveType.NOISE,
                                     durationMs = 20,
                                     volume = 0.05f
+                                )
+                            )
+                        }
+                    }
+                    else -> { // COSMIC REVOLUTION - Blistering double bass metal drums
+                        if (stepInBar % 2 == 0) { // Heavy double pedal
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 150.0,
+                                    type = AudioEngine.WaveType.SINE,
+                                    durationMs = 80,
+                                    volume = 0.26f,
+                                    pitchSlide = -1100.0
+                                )
+                            )
+                        }
+                        if (stepInBar == 4 || stepInBar == 12) {
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 500.0,
+                                    type = AudioEngine.WaveType.NOISE,
+                                    durationMs = 85,
+                                    volume = 0.18f
+                                )
+                            )
+                        }
+                        if (stepInBar % 2 == 1) { // High-speed hihat crash
+                            synthEvents.add(
+                                SynthNoteEvent(
+                                    timeMs = timeMs,
+                                    frequency = 2500.0,
+                                    type = AudioEngine.WaveType.NOISE,
+                                    durationMs = 30,
+                                    volume = 0.06f
                                 )
                             )
                         }
