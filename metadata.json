@@ -1,0 +1,6 @@
+{
+  "name": "DFJK Rhythm",
+  "description": "A high-fidelity retro chiptune rhythm game with falling notes, interactive D-F-J-K touch pads, score tracking, and custom beatmaps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
