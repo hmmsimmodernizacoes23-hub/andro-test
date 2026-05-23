@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.audio.AudioEngine
+import com.example.data.CustomSongRecord
+import com.example.data.CustomSongRepository
 import com.example.data.RhythmDatabase
 import com.example.data.ScoreRecord
 import com.example.data.ScoreRepository
@@ -39,6 +41,7 @@ enum class AppLanguage(val id: String, val displayName: String) {
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val scoreRepository: ScoreRepository
+    private val customSongRepository: CustomSongRepository
     val allScores: StateFlow<List<ScoreRecord>>
 
     private val prefs = application.getSharedPreferences("dfjk_rhythm_prefs", android.content.Context.MODE_PRIVATE)
@@ -66,11 +69,38 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val database = RhythmDatabase.getDatabase(application)
         scoreRepository = ScoreRepository(database.scoreDao())
+        customSongRepository = CustomSongRepository(database.customSongDao())
         allScores = scoreRepository.allScores.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+        // Observe custom songs asynchronously and dynamically update the lists
+        viewModelScope.launch {
+            customSongRepository.allCustomSongs.collect { customRecords ->
+                val presets = Song.createPresetSongs()
+                val loadedCustom = customRecords.mapNotNull { record ->
+                    try {
+                        Song.parseFnfJson(record.jsonContent)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                withContext(Dispatchers.Main) {
+                    songs.clear()
+                    songs.addAll(presets)
+                    songs.addAll(loadedCustom)
+                    
+                    val currentSelected = _selectedSong.value
+                    if (!songs.any { it.name == currentSelected.name }) {
+                        songs.firstOrNull()?.let {
+                            _selectedSong.value = it
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // --- Audio Engine ---
@@ -87,8 +117,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun importFnfChart(jsonString: String): Boolean {
         return try {
             val customSong = Song.parseFnfJson(jsonString)
-            songs.add(customSong)
-            changeSelectedSong(customSong)
+            viewModelScope.launch {
+                customSongRepository.saveCustomSong(
+                    CustomSongRecord(
+                        songName = customSong.name,
+                        jsonContent = jsonString
+                    )
+                )
+                withContext(Dispatchers.Main) {
+                    changeSelectedSong(customSong)
+                }
+            }
             true
         } catch (e: Exception) {
             e.printStackTrace()
@@ -147,6 +186,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // Lane Flash overlay states (last tap timestamp per lane)
     val laneFlashTime = mutableStateListOf(0L, 0L, 0L, 0L)
 
+    // Lane touch pressed tracking states
+    val lanePressed = mutableStateListOf(false, false, false, false)
+
+    fun setLanePressed(lane: Int, pressed: Boolean) {
+        if (lane in 0..3) {
+            lanePressed[lane] = pressed
+            if (pressed) {
+                laneFlashTime[lane] = _songTime.value
+            }
+        }
+    }
+
     // Floating notifications
     data class FloatingFeedback(
         val id: Long,
@@ -203,7 +254,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             GameNote(
                 id = event.id,
                 lane = event.lane,
-                hitTimeMs = event.hitTimeMs
+                hitTimeMs = event.hitTimeMs,
+                holdDurationMs = event.holdDurationMs
             )
         }
         pcmNotes.addAll(activeGameEvents)
@@ -236,6 +288,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     val note = pcmNotes.getOrNull(i) ?: continue
                     if (note.judgment == null && nowTime > note.hitTimeMs + 150) {
                         applyNoteJudgment(note, "MISS")
+                    }
+                }
+
+                // 2.5 Hold Notes hold score ticks & premature release handling
+                for (i in pcmNotes.indices) {
+                    val note = pcmNotes.getOrNull(i) ?: continue
+                    if (note.holdDurationMs > 0) {
+                        val holdEndTime = note.hitTimeMs + note.holdDurationMs
+                        if (note.isHit && !note.isHoldBroken && nowTime <= holdEndTime) {
+                            if (!lanePressed[note.lane] && nowTime > note.hitTimeMs + 150) {
+                                note.isHoldBroken = true
+                                triggerFloatingText("RELEASE", "#FF88AA", note.lane, 0.8f)
+                            } else if (lanePressed[note.lane]) {
+                                _score.value += 1
+                                if (nowTime % 120 < 10) {
+                                    laneFlashTime[note.lane] = nowTime
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -458,6 +529,8 @@ data class GameNote(
     val id: Int,
     val lane: Int,
     val hitTimeMs: Long,
+    val holdDurationMs: Long = 0L,
     var isHit: Boolean = false,
-    var judgment: String? = null
+    var judgment: String? = null,
+    var isHoldBroken: Boolean = false
 )

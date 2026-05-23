@@ -15,7 +15,8 @@ data class SynthNoteEvent(
 data class GameNoteEvent(
     val id: Int,
     val lane: Int, // 0=D, 1=F, 2=J, 3=K
-    val hitTimeMs: Long
+    val hitTimeMs: Long,
+    val holdDurationMs: Long = 0L
 )
 
 class Song(
@@ -93,7 +94,8 @@ class Song(
                                     GameNoteEvent(
                                         id = noteIdCounter++,
                                         lane = mappedLane,
-                                        hitTimeMs = timeMs
+                                        hitTimeMs = timeMs,
+                                        holdDurationMs = sustainMs
                                     )
                                 )
                             }
@@ -604,13 +606,20 @@ class Song(
                 }
 
                 // --- 2. GENERATE GAME NOTES MATCHING BEATS ---
+                val rHold = Math.random()
+                val proceduralHoldDuration = when (difficulty) {
+                    "Easy" -> 0L
+                    "Normal" -> if (rHold < 0.12) stepMs * 2 else 0L
+                    else -> if (rHold < 0.18) stepMs * 3 else 0L
+                }
+
                 when (difficulty) {
                     "Easy" -> {
                         val spawnInterval = 8
                         if (step % spawnInterval == 0) {
                             val laneCycle = listOf(0, 1, 2, 3, 2, 1)
                             val laneIndex = (step / spawnInterval) % laneCycle.size
-                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = laneCycle[laneIndex], hitTimeMs = timeMs))
+                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = laneCycle[laneIndex], hitTimeMs = timeMs, holdDurationMs = 0L))
                         }
                     }
                     "Normal" -> {
@@ -620,11 +629,11 @@ class Song(
                         if (isQuarterBeat) {
                             val laneCycle = listOf(0, 1, 2, 3, 2, 1, 3, 0)
                             val lane = laneCycle[(step / 4) % laneCycle.size]
-                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs))
+                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs, holdDurationMs = proceduralHoldDuration))
                         } else if (isOffBeat) {
                             val activeLane = (step / 4) % 4
                             val adjacentLane = (activeLane + 1) % 4
-                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = adjacentLane, hitTimeMs = timeMs))
+                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = adjacentLane, hitTimeMs = timeMs, holdDurationMs = 0L))
                         }
                     }
                     else -> { // Hard
@@ -633,19 +642,19 @@ class Song(
                         
                         if (matchesDnbKick) {
                             if (stepInBar == 0 && (bar % 4 == 0)) {
-                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = 0, hitTimeMs = timeMs))
-                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = 3, hitTimeMs = timeMs))
+                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = 0, hitTimeMs = timeMs, holdDurationMs = proceduralHoldDuration))
+                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = 3, hitTimeMs = timeMs, holdDurationMs = proceduralHoldDuration))
                             } else {
                                 val laneCycle = listOf(1, 2, 0, 3)
                                 val lane = laneCycle[(step) % laneCycle.size]
-                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs))
+                                gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs, holdDurationMs = proceduralHoldDuration))
                             }
                         } else if (matchesSnare) {
                             val lane = if (stepInBar == 4) 1 else 2
-                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs))
+                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs, holdDurationMs = 0L))
                         } else if (stepInBar % 2 != 0 && Math.random() < 0.70) {
                             val lane = (step / 2) % 4
-                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs))
+                            gameEvents.add(GameNoteEvent(id = gameNoteId++, lane = lane, hitTimeMs = timeMs, holdDurationMs = 0L))
                         }
                     }
                 }

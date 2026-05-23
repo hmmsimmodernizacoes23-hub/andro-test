@@ -1310,43 +1310,98 @@ fun PlayScreen(viewModel: GameViewModel) {
                     // 4. Draw descending Notes (EXTRA THICK & POPPING SIZES FOR POLISH)
                     // Render any notes whose hitTimeMs falls inside active window
                     viewModel.pcmNotes.forEach { note ->
-                        if (note.isHit || note.judgment == "MISS") return@forEach
+                        if (note.judgment == "MISS") return@forEach
 
-                        val progress = (songTime - (note.hitTimeMs - spawnTimeMs)).toFloat() / spawnTimeMs
-                        val noteY = progress * hitLineY
+                        val headTime = note.hitTimeMs
+                        val tailTime = note.hitTimeMs + note.holdDurationMs
 
-                        // Note is visible before collision and shortly after
-                        if (progress in 0.0f..1.12f) {
-                            val laneX = note.lane * laneWidth
-                            val xPadding = 4f // Thin padding = maximum note thickness!
-                            val noteH = 75f   // Extreme BOLD depth & volume!
-                            val noteColor = when (note.lane) {
-                                0 -> colors.accentLavender
-                                1 -> colors.accentCyan
-                                2 -> colors.accentPink
-                                else -> colors.accentGreen
+                        // Skip rendering if note is hit/completed and has no remaining hold tail
+                        if (note.isHit && (note.holdDurationMs <= 0 || songTime > tailTime)) {
+                            return@forEach
+                        }
+
+                        val laneX = note.lane * laneWidth
+                        val laneCenter = laneX + (laneWidth / 2f)
+
+                        // 4a. Draw HOLD TAIL if applicable
+                        if (note.holdDurationMs > 0) {
+                            val headY = hitLineY + ((songTime - headTime).toFloat() / spawnTimeMs * hitLineY)
+                            val tailY = hitLineY + ((songTime - tailTime).toFloat() / spawnTimeMs * hitLineY)
+
+                            // Define the bounds of the tail ribbon to render
+                            val bottomY = if (note.isHit) hitLineY else headY
+                            val topY = tailY
+
+                            // Only render if in visible vertical range of the field
+                            val drawBottom = bottomY.coerceIn(0f, height)
+                            val drawTop = topY.coerceIn(0f, height)
+
+                            if (drawBottom > drawTop) {
+                                val tailWidth = laneWidth * 0.45f
+                                val isHeldActive = note.isHit && !note.isHoldBroken
+                                val tailAlpha = if (isHeldActive) 0.65f else 0.35f
+                                val tailColor = when (note.lane) {
+                                    0 -> colors.accentLavender
+                                    1 -> colors.accentCyan
+                                    2 -> colors.accentPink
+                                    else -> colors.accentGreen
+                                }
+
+                                // Ribbon background Capsule
+                                drawRoundRect(
+                                    color = tailColor.copy(alpha = tailAlpha),
+                                    topLeft = Offset(laneCenter - tailWidth / 2f, drawTop),
+                                    size = Size(tailWidth, drawBottom - drawTop),
+                                    cornerRadius = CornerRadius(12f, 12f)
+                                )
+
+                                // Reflective neon electricity style core line
+                                drawLine(
+                                    color = Color.White.copy(alpha = if (isHeldActive) 0.9f else 0.4f),
+                                    start = Offset(laneCenter, drawTop),
+                                    end = Offset(laneCenter, drawBottom),
+                                    strokeWidth = 5.0f
+                                )
                             }
+                        }
 
-                            drawRoundRect(
-                                brush = Brush.horizontalGradient(
-                                    colors = listOf(
-                                        noteColor.copy(alpha = 0.7f),
-                                        noteColor,
-                                        noteColor.copy(alpha = 0.7f)
-                                    )
-                                ),
-                                topLeft = Offset(laneX + xPadding, noteY - noteH / 2f),
-                                size = Size(laneWidth - (xPadding * 2), noteH),
-                                cornerRadius = CornerRadius(20f, 20f)
-                            )
+                        // 4b. Draw NOTE HEAD if NOT hit yet
+                        if (!note.isHit) {
+                            val progress = (songTime - (headTime - spawnTimeMs)).toFloat() / spawnTimeMs
+                            val noteY = progress * hitLineY
 
-                            // Bright neon reflective white core line (Highly visible thick core)
-                            drawLine(
-                                color = Color.White.copy(alpha = 0.95f),
-                                start = Offset(laneX + xPadding + 10f, noteY),
-                                end = Offset(laneX + laneWidth - xPadding - 10f, noteY),
-                                strokeWidth = 9.0f // Thick 9f neon glow core!
-                            )
+                            // Draw only if progress is within visible boundaries
+                            if (progress in 0.0f..1.12f) {
+                                val xPadding = 4f // Thin padding = maximum note thickness!
+                                val noteH = 75f   // Extreme BOLD depth & volume!
+                                val noteColor = when (note.lane) {
+                                    0 -> colors.accentLavender
+                                    1 -> colors.accentCyan
+                                    2 -> colors.accentPink
+                                    else -> colors.accentGreen
+                                }
+
+                                drawRoundRect(
+                                    brush = Brush.horizontalGradient(
+                                        colors = listOf(
+                                            noteColor.copy(alpha = 0.7f),
+                                            noteColor,
+                                            noteColor.copy(alpha = 0.7f)
+                                        )
+                                    ),
+                                    topLeft = Offset(laneX + xPadding, noteY - noteH / 2f),
+                                    size = Size(laneWidth - (xPadding * 2), noteH),
+                                    cornerRadius = CornerRadius(20f, 20f)
+                                )
+
+                                // Bright neon reflective white core line (Highly visible thick core)
+                                drawLine(
+                                    color = Color.White.copy(alpha = 0.95f),
+                                    start = Offset(laneX + xPadding + 10f, noteY),
+                                    end = Offset(laneX + laneWidth - xPadding - 10f, noteY),
+                                    strokeWidth = 9.0f // Thick 9f neon glow core!
+                                )
+                            }
                         }
                     }
                 }
@@ -1356,7 +1411,8 @@ fun PlayScreen(viewModel: GameViewModel) {
                     for (i in 0..3) {
                         val lastTap = viewModel.laneFlashTime[i]
                         val diff = songTime - lastTap
-                        val alpha = (1f - (diff.toFloat() / 200f)).coerceIn(0f, 1f)
+                        val rawAlpha = (1f - (diff.toFloat() / 200f)).coerceIn(0f, 1f)
+                        val alpha = if (viewModel.lanePressed.getOrNull(i) == true) 1.0f else rawAlpha
 
                         Box(
                             modifier = Modifier
@@ -1452,7 +1508,13 @@ fun PlayScreen(viewModel: GameViewModel) {
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onPress = {
+                                            viewModel.setLanePressed(i, true)
                                             viewModel.registerLaneTap(i)
+                                            try {
+                                                awaitRelease()
+                                            } finally {
+                                                viewModel.setLanePressed(i, false)
+                                            }
                                         }
                                     )
                                 }
@@ -1483,7 +1545,7 @@ fun PlayScreen(viewModel: GameViewModel) {
                         
                         val lastTap = viewModel.laneFlashTime[i]
                         val diff = songTime - lastTap
-                        val isActive = diff < 150
+                        val isActive = (diff < 150) || (viewModel.lanePressed.getOrNull(i) == true)
                         
                         val keyBgColor = if (isActive) {
                             when (i) {
@@ -1516,7 +1578,13 @@ fun PlayScreen(viewModel: GameViewModel) {
                                 .pointerInput(Unit) {
                                     detectTapGestures(
                                         onPress = {
+                                            viewModel.setLanePressed(i, true)
                                             viewModel.registerLaneTap(i)
+                                            try {
+                                                awaitRelease()
+                                            } finally {
+                                                viewModel.setLanePressed(i, false)
+                                            }
                                         }
                                     )
                                 },
