@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
 data class CustomSongRecord(
     @PrimaryKey val songName: String,
     val jsonContent: String,
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val audioOggUri: String? = null
 )

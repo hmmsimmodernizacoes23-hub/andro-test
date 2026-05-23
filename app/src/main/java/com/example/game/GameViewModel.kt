@@ -82,7 +82,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 val presets = Song.createPresetSongs()
                 val loadedCustom = customRecords.mapNotNull { record ->
                     try {
-                        Song.parseFnfJson(record.jsonContent)
+                        val parsed = Song.parseFnfJson(record.jsonContent)
+                        Song(
+                            name = parsed.name,
+                            bpm = parsed.bpm,
+                            difficulty = parsed.difficulty,
+                            durationMs = parsed.durationMs,
+                            synthNotes = parsed.synthNotes,
+                            gameNotes = parsed.gameNotes,
+                            audioOggUri = record.audioOggUri
+                        )
                     } catch (e: Exception) {
                         null
                     }
@@ -106,6 +115,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // --- Audio Engine ---
     private val audioEngine = AudioEngine()
 
+    // --- Custom .ogg media player ---
+    private var mediaPlayer: android.media.MediaPlayer? = null
+
     // --- Preset Songs & FNF Imports ---
     val songs = mutableStateListOf<Song>().apply {
         addAll(Song.createPresetSongs())
@@ -114,14 +126,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedSong = MutableStateFlow(songs[0])
     val selectedSong: StateFlow<Song> = _selectedSong.asStateFlow()
 
-    fun importFnfChart(jsonString: String): Boolean {
+    fun importFnfChart(jsonString: String, audioOggUri: String? = null): Boolean {
         return try {
-            val customSong = Song.parseFnfJson(jsonString)
+            val customSong = Song.parseFnfJson(jsonString, audioOggUri)
             viewModelScope.launch {
                 customSongRepository.saveCustomSong(
                     CustomSongRecord(
                         songName = customSong.name,
-                        jsonContent = jsonString
+                        jsonContent = jsonString,
+                        audioOggUri = audioOggUri
                     )
                 )
                 withContext(Dispatchers.Main) {
@@ -132,6 +145,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             e.printStackTrace()
             false
+        }
+    }
+
+    fun copyUriToLocalFile(uri: android.net.Uri, songName: String): String? {
+        return try {
+            val context = getApplication<Application>()
+            val contentResolver = context.contentResolver
+            val cleanName = songName.replace(Regex("[^a-zA-Z0-9_]"), "_").lowercase()
+            val outputFile = java.io.File(context.filesDir, "audio_$cleanName.ogg")
+            
+            contentResolver.openInputStream(uri)?.use { inputStream ->
+                java.io.FileOutputStream(outputFile).use { outputStream ->
+                    inputStream.copyTo(outputStream)
+                }
+            }
+            outputFile.absolutePath
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
@@ -261,26 +293,81 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         pcmNotes.addAll(activeGameEvents)
 
         audioEngine.start()
-        
-        val realStartTime = System.currentTimeMillis()
-        val synthList = _selectedSong.value.synthNotes
 
+        // Cleanup any old mediaPlayer
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (e: Exception) {}
+        mediaPlayer = null
+
+        val oggUri = _selectedSong.value.audioOggUri
+        val hasOgg = !oggUri.isNullOrBlank()
+
+        if (hasOgg) {
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val mp = android.media.MediaPlayer().apply {
+                        setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
+                        setDataSource(oggUri)
+                        prepare()
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (_gameState.value == GameState.PLAYING) {
+                            mediaPlayer = mp
+                            mp.start()
+                            startGameLoop(System.currentTimeMillis())
+                        } else {
+                            mp.release()
+                        }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    withContext(Dispatchers.Main) {
+                        if (_gameState.value == GameState.PLAYING) {
+                            startGameLoop(System.currentTimeMillis())
+                        }
+                    }
+                }
+            }
+        } else {
+            startGameLoop(System.currentTimeMillis())
+        }
+    }
+
+    private fun startGameLoop(realStartTime: Long) {
+        val synthList = _selectedSong.value.synthNotes
         gameLoopJob = viewModelScope.launch {
             while (_gameState.value == GameState.PLAYING) {
-                val nowTime = System.currentTimeMillis() - realStartTime
+                val mp = mediaPlayer
+                val nowTime = if (mp != null) {
+                    try {
+                        if (mp.isPlaying) {
+                            mp.currentPosition.toLong()
+                        } else {
+                            System.currentTimeMillis() - realStartTime
+                        }
+                    } catch (e: Exception) {
+                        System.currentTimeMillis() - realStartTime
+                    }
+                } else {
+                    System.currentTimeMillis() - realStartTime
+                }
                 _songTime.value = nowTime
 
-                // 1. Play Synthesized Musical note events
-                while (audioScheduleIndex < synthList.size && synthList[audioScheduleIndex].timeMs <= nowTime) {
-                    val event = synthList[audioScheduleIndex]
-                    audioEngine.playTone(
-                        frequency = event.frequency,
-                        type = event.type,
-                        durationMs = event.durationMs,
-                        volume = event.volume,
-                        pitchSlideSpeed = event.pitchSlide
-                    )
-                    audioScheduleIndex++
+                // 1. Play Synthesized Musical note events (only if we are NOT playing an OGG audio file)
+                if (mediaPlayer == null) {
+                    while (audioScheduleIndex < synthList.size && synthList[audioScheduleIndex].timeMs <= nowTime) {
+                        val event = synthList[audioScheduleIndex]
+                        audioEngine.playTone(
+                            frequency = event.frequency,
+                            type = event.type,
+                            durationMs = event.durationMs,
+                            volume = event.volume,
+                            pitchSlideSpeed = event.pitchSlide
+                        )
+                        audioScheduleIndex++
+                    }
                 }
 
                 // 2. Drive auto-miss evaluation for notes that sailed past hit threshold (150ms late)
@@ -311,7 +398,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 3. Ending Condition
-                if (nowTime >= _selectedSong.value.durationMs + 1000) {
+                val isSongFinished = if (mediaPlayer != null) {
+                    try {
+                        !mediaPlayer!!.isPlaying && nowTime >= _selectedSong.value.durationMs - 500
+                    } catch (e: Exception) {
+                        nowTime >= _selectedSong.value.durationMs + 1000
+                    }
+                } else {
+                    nowTime >= _selectedSong.value.durationMs + 1000
+                }
+
+                if (isSongFinished) {
                     endGameSuccess()
                     break
                 }
@@ -511,6 +608,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         gameLoopJob?.cancel()
         gameLoopJob = null
         audioEngine.stop()
+        try {
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+        } catch (e: Exception) {}
+        mediaPlayer = null
     }
 
     fun clearAllHighScores() {

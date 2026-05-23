@@ -41,6 +41,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.data.ScoreRecord
 import com.example.game.GameViewModel
 import com.example.game.Song
@@ -373,8 +375,28 @@ fun TitleScreen(viewModel: GameViewModel) {
 
     var showImportDialog by remember { mutableStateOf(false) }
     var pastedJsonText by remember { mutableStateOf("") }
+    var audioOggInputPath by remember { mutableStateOf("") }
+    var selectedAudioUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var parseErrorMsg by remember { mutableStateOf<String?>(null) }
     var parseSuccessMsg by remember { mutableStateOf<String?>(null) }
+
+    val context = LocalContext.current
+
+    val audioLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            selectedAudioUri = uri
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            val nameIndex = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            var displayName = ""
+            if (cursor != null && nameIndex != null && cursor.moveToFirst()) {
+                displayName = cursor.getString(nameIndex)
+            }
+            cursor?.close()
+            audioOggInputPath = if (displayName.isNotEmpty()) displayName else uri.toString()
+        }
+    }
 
     // Trigger initial observing hook
     LaunchedEffect(selectedSong) {
@@ -386,6 +408,8 @@ fun TitleScreen(viewModel: GameViewModel) {
             onDismissRequest = {
                 showImportDialog = false
                 pastedJsonText = ""
+                audioOggInputPath = ""
+                selectedAudioUri = null
                 parseErrorMsg = null
                 parseSuccessMsg = null
             },
@@ -445,7 +469,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(150.dp),
+                            .height(110.dp),
                         textStyle = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = FontFamily.Monospace,
                             fontSize = 11.sp
@@ -458,6 +482,75 @@ fun TitleScreen(viewModel: GameViewModel) {
                         ),
                         singleLine = false
                     )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = "Add custom .ogg audio (optional):",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = colors.lightAccentText
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = audioOggInputPath,
+                            onValueChange = {
+                                audioOggInputPath = it
+                                selectedAudioUri = null // clear picker if typed URL instead
+                            },
+                            placeholder = {
+                                Text(
+                                    "Paste URL or browse local audio",
+                                    color = colors.lightAccentText.copy(alpha = 0.5f),
+                                    fontSize = 12.sp
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(56.dp),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 12.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colors.accentLavender,
+                                unfocusedBorderColor = colors.keyPassiveBg,
+                                focusedTextColor = colors.textLight,
+                                unfocusedTextColor = colors.textLight
+                            ),
+                            singleLine = true
+                        )
+
+                        Button(
+                            onClick = {
+                                try {
+                                    audioLauncher.launch("audio/*")
+                                } catch (e: Exception) {
+                                    parseErrorMsg = "Could not launch file picker."
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.textLight
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier
+                                .width(52.dp)
+                                .height(50.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Browse local files",
+                                tint = colors.accentPink
+                            )
+                        }
+                    }
 
                     Text(
                         text = "Or try one of our loaded charts:",
@@ -537,10 +630,35 @@ fun TitleScreen(viewModel: GameViewModel) {
                             parseErrorMsg = "Please paste or select a JSON chart first!"
                             return@Button
                         }
-                        val success = viewModel.importFnfChart(pastedJsonText)
+
+                        val parsedSongForName = try {
+                            Song.parseFnfJson(pastedJsonText)
+                        } catch (e: Exception) {
+                            null
+                        }
+
+                        if (parsedSongForName == null) {
+                            parseErrorMsg = "Error parsing FNF format. Please check syntax."
+                            return@Button
+                        }
+
+                        var finalAudioUriString: String? = null
+                        val uri = selectedAudioUri
+                        if (uri != null) {
+                            val localPath = viewModel.copyUriToLocalFile(uri, parsedSongForName.name)
+                            if (localPath != null) {
+                                finalAudioUriString = localPath
+                            }
+                        } else if (audioOggInputPath.isNotBlank()) {
+                            finalAudioUriString = audioOggInputPath
+                        }
+
+                        val success = viewModel.importFnfChart(pastedJsonText, finalAudioUriString)
                         if (success) {
                             showImportDialog = false
                             pastedJsonText = ""
+                            audioOggInputPath = ""
+                            selectedAudioUri = null
                             parseErrorMsg = null
                             parseSuccessMsg = null
                         } else {
@@ -561,6 +679,8 @@ fun TitleScreen(viewModel: GameViewModel) {
                     onClick = {
                         showImportDialog = false
                         pastedJsonText = ""
+                        audioOggInputPath = ""
+                        selectedAudioUri = null
                         parseErrorMsg = null
                         parseSuccessMsg = null
                     }

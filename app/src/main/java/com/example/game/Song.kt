@@ -25,7 +25,8 @@ class Song(
     val difficulty: String,
     val durationMs: Long,
     val synthNotes: List<SynthNoteEvent>,
-    val gameNotes: List<GameNoteEvent>
+    val gameNotes: List<GameNoteEvent>,
+    val audioOggUri: String? = null
 ) {
     companion object {
         // Pentatonic Scale: A, C, D, E, G
@@ -48,7 +49,7 @@ class Song(
             )
         }
 
-        fun parseFnfJson(jsonString: String): Song {
+        fun parseFnfJson(jsonString: String, audioOggUri: String? = null): Song {
             val root = JSONObject(jsonString)
             val songObj = root.optJSONObject("song") ?: root
             val songName = songObj.optString("song", "FNF Custom").uppercase()
@@ -201,7 +202,8 @@ class Song(
                 difficulty = "FNF",
                 durationMs = finalSongDuration,
                 synthNotes = synthEvents.sortedBy { it.timeMs },
-                gameNotes = gameEvents.sortedBy { it.hitTimeMs }
+                gameNotes = gameEvents.sortedBy { it.hitTimeMs },
+                audioOggUri = audioOggUri
             )
         }
 
