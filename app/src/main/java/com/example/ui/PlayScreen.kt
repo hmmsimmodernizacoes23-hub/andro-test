@@ -1020,7 +1020,7 @@ fun PlayScreen(viewModel: GameViewModel) {
                     val width = size.width
                     val height = size.height
                     val laneWidth = width / 4f
-                    val hitLineY = height * 0.85f
+                    val hitLineY = height * 0.90f
 
                     // 1. Draw Lane board backgrounds
                     for (i in 0..3) {
@@ -1165,7 +1165,7 @@ fun PlayScreen(viewModel: GameViewModel) {
                                 .width(perLaneWidth)
                                 .align(Alignment.BottomStart)
                                 .offset(x = perLaneWidth * feedback.lane)
-                                .padding(bottom = 140.dp),
+                                .padding(bottom = 60.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -1228,131 +1228,130 @@ fun PlayScreen(viewModel: GameViewModel) {
                         )
                     }
                 }
+            }
 
-                // 9. Bottom tactile controls deck keys layout overlay (Touch target sizes >= 48dp)
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .background(colors.cardBg, shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
-                        .padding(bottom = 8.dp)
+            // 9. Bottom tactile controls deck keys layout (Touch target sizes >= 48dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.cardBg, shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .padding(horizontal = 16.dp, vertical = 16.dp)
+                    .padding(bottom = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        for (i in 0..3) {
-                            val keyTag = when (i) {
-                                0 -> "D"
-                                1 -> "F"
-                                2 -> "J"
-                                else -> "K"
+                    for (i in 0..3) {
+                        val keyTag = when (i) {
+                            0 -> "D"
+                            1 -> "F"
+                            2 -> "J"
+                            else -> "K"
+                        }
+                        
+                        val lastTap = viewModel.laneFlashTime[i]
+                        val diff = songTime - lastTap
+                        val isActive = diff < 150
+                        
+                        val keyBgColor = if (isActive) {
+                            when (i) {
+                                0 -> colors.accentLavender
+                                1 -> colors.accentCyan
+                                2 -> colors.accentPink
+                                else -> colors.accentLavender
                             }
-                            
-                            val lastTap = viewModel.laneFlashTime[i]
-                            val diff = songTime - lastTap
-                            val isActive = diff < 150
-                            
-                            val keyBgColor = if (isActive) {
-                                when (i) {
-                                    0 -> colors.accentLavender
-                                    1 -> colors.accentCyan
-                                    2 -> colors.accentPink
-                                    else -> colors.accentLavender
-                                }
-                            } else {
-                                colors.keyPassiveBg
-                            }
+                        } else {
+                            colors.keyPassiveBg
+                        }
 
-                            val keyTextColor = if (isActive) {
-                                Color(0xFF131118)
-                            } else {
-                                colors.textLight
-                            }
+                        val keyTextColor = if (isActive) {
+                            Color(0xFF131118)
+                        } else {
+                            colors.textLight
+                        }
 
-                            val borderModifier = if (i == 2 && !isActive) {
-                                Modifier.border(2.dp, colors.accentLavender.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                            } else Modifier
+                        val borderModifier = if (i == 2 && !isActive) {
+                            Modifier.border(2.dp, colors.accentLavender.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                        } else Modifier
 
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(keyBgColor)
-                                    .then(borderModifier)
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onPress = {
-                                                viewModel.registerLaneTap(i)
-                                            }
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = keyTag,
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace
-                                    ),
-                                    color = keyTextColor
-                                )
-                            }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .aspectRatio(1.3f)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(keyBgColor)
+                                .then(borderModifier)
+                                .pointerInput(Unit) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            viewModel.registerLaneTap(i)
+                                        }
+                                    )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = keyTag,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontFamily = FontFamily.Monospace
+                                ),
+                                color = keyTextColor
+                            )
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(colors.accentGreen)
-                            )
-                            Text(
-                                text = "STABLE 60FPS",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
-                                ),
-                                color = colors.lightAccentText
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                viewModel.exitToTitle()
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = colors.keyPassiveBg,
-                                contentColor = colors.accentLavender
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(colors.accentGreen)
+                        )
+                        Text(
+                            text = "STABLE 60FPS",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 0.5.sp
                             ),
-                            shape = RoundedCornerShape(50),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
-                            modifier = Modifier.height(34.dp)
-                        ) {
-                            Text(
-                                text = TranslationManager.getString("cancel", currentLanguage).uppercase(),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
+                            color = colors.lightAccentText
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            viewModel.exitToTitle()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.keyPassiveBg,
+                            contentColor = colors.accentLavender
+                        ),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp)
+                    ) {
+                        Text(
+                            text = TranslationManager.getString("cancel", currentLanguage).uppercase(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
                             )
-                        }
+                        )
                     }
                 }
             }
