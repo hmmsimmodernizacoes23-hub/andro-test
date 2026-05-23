@@ -115,8 +115,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         observeHighScoreForSelectedSong()
     }
 
+    private var highScoreJob: Job? = null
+
     fun observeHighScoreForSelectedSong() {
-        viewModelScope.launch {
+        highScoreJob?.cancel()
+        highScoreJob = viewModelScope.launch {
             scoreRepository.getHighScore(_selectedSong.value.name).collect { record ->
                 _highScore.value = record
             }
@@ -158,7 +161,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val realStartTime = System.currentTimeMillis()
         val synthList = _selectedSong.value.synthNotes
 
-        gameLoopJob = viewModelScope.launch(Dispatchers.Default) {
+        gameLoopJob = viewModelScope.launch {
             while (_gameState.value == GameState.PLAYING) {
                 val nowTime = System.currentTimeMillis() - realStartTime
                 _songTime.value = nowTime
@@ -177,22 +180,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 2. Drive auto-miss evaluation for notes that sailed past hit threshold (150ms late)
-                val iterator = pcmNotes.iterator()
-                while (iterator.hasNext()) {
-                    val note = iterator.next()
+                for (i in pcmNotes.indices) {
+                    val note = pcmNotes.getOrNull(i) ?: continue
                     if (note.judgment == null && nowTime > note.hitTimeMs + 150) {
-                        note.judgment = "MISS"
-                        withContext(Dispatchers.Main) {
-                            applyNoteJudgment(note, "MISS")
-                        }
+                        applyNoteJudgment(note, "MISS")
                     }
                 }
 
                 // 3. Ending Condition
                 if (nowTime >= _selectedSong.value.durationMs + 1000) {
-                    withContext(Dispatchers.Main) {
-                        endGameSuccess()
-                    }
+                    endGameSuccess()
                     break
                 }
 
@@ -305,21 +302,37 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun terminateGameOver() {
         _gameState.value = GameState.FAILED
-        stopSongAudio()
+        gameLoopJob?.cancel()
+        gameLoopJob = null
         
-        // Fail sound: deep retro slide down
-        viewModelScope.launch(Dispatchers.Default) {
-            val tempEngine = AudioEngine()
-            tempEngine.start()
-            tempEngine.playTone(180.0, AudioEngine.WaveType.SAWTOOTH, 500, volume = 0.3f, pitchSlideSpeed = -300.0)
+        // Play fail sound directly on the main, running audioEngine!
+        audioEngine.playTone(180.0, AudioEngine.WaveType.SAWTOOTH, 500, volume = 0.3f, pitchSlideSpeed = -300.0)
+        
+        viewModelScope.launch {
             delay(600)
-            tempEngine.stop()
+            if (_gameState.value == GameState.FAILED) {
+                audioEngine.stop()
+            }
         }
     }
 
     private fun endGameSuccess() {
         _gameState.value = GameState.RESULTS
-        stopSongAudio()
+        gameLoopJob?.cancel()
+        gameLoopJob = null
+
+        // Celebrate success sound: retro hyper arpeggio directly on the main, running audioEngine!
+        viewModelScope.launch {
+            val scale = doubleArrayOf(523.25, 659.25, 783.99, 1046.50) // C major arpeggio
+            for (noteFreq in scale) {
+                audioEngine.playTone(noteFreq, AudioEngine.WaveType.SQUARE, 120, volume = 0.25f)
+                delay(120)
+            }
+            delay(400)
+            if (_gameState.value == GameState.RESULTS) {
+                audioEngine.stop()
+            }
+        }
 
         // Calculate final grade
         val rankStr = calculateFinalRank()
@@ -351,18 +364,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             withContext(Dispatchers.Main) {
                 observeHighScoreForSelectedSong()
             }
-        }
-
-        // Celebrate success sound: retro hyper arpeggio
-        viewModelScope.launch(Dispatchers.Default) {
-            val tempEngine = AudioEngine()
-            tempEngine.start()
-            val scale = doubleArrayOf(523.25, 659.25, 783.99, 1046.50) // C major arpeggio
-            for (noteFreq in scale) {
-                tempEngine.playTone(noteFreq, AudioEngine.WaveType.SQUARE, 120, volume = 0.25f)
-                delay(120)
-            }
-            tempEngine.stop()
         }
     }
 

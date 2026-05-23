@@ -19,7 +19,9 @@ abstract class RhythmDatabase : RoomDatabase() {
                     context.applicationContext,
                     RhythmDatabase::class.java,
                     "rhythm_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration()
+                .build()
                 INSTANCE = instance
                 instance
             }

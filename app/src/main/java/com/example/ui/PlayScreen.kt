@@ -679,8 +679,8 @@ fun PlayScreen(viewModel: GameViewModel) {
                         // Note is visible before collision and shortly after
                         if (progress in 0.0f..1.12f) {
                             val laneX = note.lane * laneWidth
-                            val xPadding = 12f
-                            val noteH = 26f
+                            val xPadding = 8f
+                            val noteH = 42f
                             val noteColor = when (note.lane) {
                                 0 -> AccentLavender
                                 1 -> AccentCyan
@@ -698,15 +698,15 @@ fun PlayScreen(viewModel: GameViewModel) {
                                 ),
                                 topLeft = Offset(laneX + xPadding, noteY - noteH / 2f),
                                 size = Size(laneWidth - (xPadding * 2), noteH),
-                                cornerRadius = CornerRadius(12f, 12f)
+                                cornerRadius = CornerRadius(14f, 14f)
                             )
 
                             // Bright neon reflective white core line
                             drawLine(
-                                color = Color.White.copy(alpha = 0.9f),
-                                start = Offset(laneX + xPadding + 8f, noteY),
-                                end = Offset(laneX + laneWidth - xPadding - 8f, noteY),
-                                strokeWidth = 3f
+                                color = Color.White.copy(alpha = 0.95f),
+                                start = Offset(laneX + xPadding + 10f, noteY),
+                                end = Offset(laneX + laneWidth - xPadding - 10f, noteY),
+                                strokeWidth = 4.5f
                             )
                         }
                     }
