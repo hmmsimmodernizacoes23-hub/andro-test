@@ -371,9 +371,204 @@ fun TitleScreen(viewModel: GameViewModel) {
     val colors = ThemeManager.getColors(activeTheme)
     val haptic = LocalHapticFeedback.current
 
+    var showImportDialog by remember { mutableStateOf(false) }
+    var pastedJsonText by remember { mutableStateOf("") }
+    var parseErrorMsg by remember { mutableStateOf<String?>(null) }
+    var parseSuccessMsg by remember { mutableStateOf<String?>(null) }
+
     // Trigger initial observing hook
     LaunchedEffect(selectedSong) {
         viewModel.observeHighScoreForSelectedSong()
+    }
+
+    if (showImportDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showImportDialog = false
+                pastedJsonText = ""
+                parseErrorMsg = null
+                parseSuccessMsg = null
+            },
+            containerColor = colors.cardBg,
+            title = {
+                Text(
+                    text = "IMPORT FNF CHART",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.ExtraBold,
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    color = colors.accentPink
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Paste FNF (Friday Night Funkin') style JSON chart data. We will dynamically synthesize play tracks and chiptunes based on notes & BPM!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textLight.copy(alpha = 0.8f)
+                    )
+
+                    if (parseErrorMsg != null) {
+                        Text(
+                            text = parseErrorMsg!!,
+                            color = colors.accentPink,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
+                    if (parseSuccessMsg != null) {
+                        Text(
+                            text = parseSuccessMsg!!,
+                            color = colors.accentGreen,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+
+                    OutlinedTextField(
+                        value = pastedJsonText,
+                        onValueChange = {
+                            pastedJsonText = it
+                            parseErrorMsg = null
+                            parseSuccessMsg = null
+                        },
+                        placeholder = {
+                            Text(
+                                "{\"song\": {\"song\": \"Bopeebo\", \"bpm\": 115, ...}}",
+                                color = colors.lightAccentText.copy(alpha = 0.5f),
+                                fontSize = 12.sp
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 11.sp
+                        ),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = colors.accentLavender,
+                            unfocusedBorderColor = colors.keyPassiveBg,
+                            focusedTextColor = colors.textLight,
+                            unfocusedTextColor = colors.textLight
+                        ),
+                        singleLine = false
+                    )
+
+                    Text(
+                        text = "Or try one of our loaded charts:",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = colors.lightAccentText
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                pastedJsonText = com.example.game.FnfPresetCharts.TUTORIAL_FNF
+                                parseErrorMsg = null
+                                parseSuccessMsg = null
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.textLight
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp)
+                        ) {
+                            Text("TUTORIAL", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                pastedJsonText = com.example.game.FnfPresetCharts.BOPEEBO_FNF
+                                parseErrorMsg = null
+                                parseSuccessMsg = null
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.textLight
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp)
+                        ) {
+                            Text("BOPEEBO", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                pastedJsonText = com.example.game.FnfPresetCharts.DADBATTLE_FNF
+                                parseErrorMsg = null
+                                parseSuccessMsg = null
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.textLight
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(32.dp)
+                        ) {
+                            Text("DADBATTLE", fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (pastedJsonText.isBlank()) {
+                            parseErrorMsg = "Please paste or select a JSON chart first!"
+                            return@Button
+                        }
+                        val success = viewModel.importFnfChart(pastedJsonText)
+                        if (success) {
+                            showImportDialog = false
+                            pastedJsonText = ""
+                            parseErrorMsg = null
+                            parseSuccessMsg = null
+                        } else {
+                            parseErrorMsg = "Error parsing FNF format. Please check syntax."
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.accentLavender,
+                        contentColor = colors.bg
+                    ),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("PARSE & LOAD", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showImportDialog = false
+                        pastedJsonText = ""
+                        parseErrorMsg = null
+                        parseSuccessMsg = null
+                    }
+                ) {
+                    Text("CANCEL", color = colors.lightAccentText, fontWeight = FontWeight.Bold)
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -529,15 +724,51 @@ fun TitleScreen(viewModel: GameViewModel) {
 
                 // Section 1: Song Selection
                 item {
-                    Text(
-                        text = TranslationManager.getString("choose_song", currentLanguage),
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.5.sp
-                        ),
-                        color = colors.textLight,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = TranslationManager.getString("choose_song", currentLanguage),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.5.sp
+                            ),
+                            color = colors.textLight
+                        )
+                        
+                        Button(
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                showImportDialog = true
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.accentPink.copy(alpha = 0.2f),
+                                contentColor = colors.accentPink
+                            ),
+                            border = BorderStroke(1.dp, colors.accentPink.copy(alpha = 0.5f)),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Import FNF",
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "IMPORT FNF",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+                    }
 
                     // Display Preset Cards
                     viewModel.songs.forEach { song ->

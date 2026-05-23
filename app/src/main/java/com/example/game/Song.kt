@@ -1,6 +1,7 @@
 package com.example.game
 
 import com.example.audio.AudioEngine
+import org.json.JSONObject
 
 data class SynthNoteEvent(
     val timeMs: Long,
@@ -39,7 +40,166 @@ class Song(
                 generateProceduralSong("VOLTAGE SURGE", 145, "Normal"),
                 generateProceduralSong("GLITCHED MEMORIES", 152, "Normal"),
                 generateProceduralSong("INFINITY OVERRIDE", 172, "Hard"),
-                generateProceduralSong("COSMIC REVOLUTION", 185, "Hard")
+                generateProceduralSong("COSMIC REVOLUTION", 185, "Hard"),
+                parseFnfJson(FnfPresetCharts.TUTORIAL_FNF),
+                parseFnfJson(FnfPresetCharts.BOPEEBO_FNF),
+                parseFnfJson(FnfPresetCharts.DADBATTLE_FNF)
+            )
+        }
+
+        fun parseFnfJson(jsonString: String): Song {
+            val root = JSONObject(jsonString)
+            val songObj = root.optJSONObject("song") ?: root
+            val songName = songObj.optString("song", "FNF Custom").uppercase()
+            val bpm = songObj.optInt("bpm", 150)
+            
+            val gameEvents = mutableListOf<GameNoteEvent>()
+            val synthEvents = mutableListOf<SynthNoteEvent>()
+            
+            var noteIdCounter = 0
+            val sectionsArray = songObj.optJSONArray("notes")
+            
+            if (sectionsArray != null) {
+                for (s in 0 until sectionsArray.length()) {
+                    val section = sectionsArray.optJSONObject(s) ?: continue
+                    val mustHit = section.optBoolean("mustHitSection", true)
+                    val sectionNotes = section.optJSONArray("sectionNotes") ?: continue
+                    
+                    for (n in 0 until sectionNotes.length()) {
+                        val noteArr = sectionNotes.optJSONArray(n) ?: continue
+                        if (noteArr.length() >= 2) {
+                            val timeMs = noteArr.optDouble(0).toLong()
+                            val rawLane = noteArr.optInt(1)
+                            val sustainMs = if (noteArr.length() >= 3) noteArr.optDouble(2).toLong() else 0L
+                            
+                            val isPlayer: Boolean
+                            val mappedLane: Int
+                            
+                            if (rawLane in 0..7) {
+                                if (mustHit) {
+                                    isPlayer = rawLane < 4
+                                    mappedLane = if (isPlayer) rawLane else rawLane - 4
+                                } else {
+                                    isPlayer = rawLane >= 4
+                                    mappedLane = if (isPlayer) rawLane - 4 else rawLane
+                                }
+                            } else {
+                                isPlayer = true
+                                mappedLane = (rawLane % 4).coerceAtLeast(0)
+                            }
+                            
+                            if (isPlayer) {
+                                gameEvents.add(
+                                    GameNoteEvent(
+                                        id = noteIdCounter++,
+                                        lane = mappedLane,
+                                        hitTimeMs = timeMs
+                                    )
+                                )
+                            }
+                            
+                            val frequency = when (mappedLane) {
+                                0 -> 261.63 // C4
+                                1 -> 293.66 // D4
+                                2 -> 329.63 // E4
+                                3 -> 392.00 // G4
+                                else -> 440.00
+                            }
+                            
+                            if (!isPlayer) {
+                                synthEvents.add(
+                                    SynthNoteEvent(
+                                        timeMs = timeMs,
+                                        frequency = frequency,
+                                        type = AudioEngine.WaveType.SAWTOOTH,
+                                        durationMs = if (sustainMs > 50) sustainMs.toInt() else 120,
+                                        volume = 0.12f
+                                    )
+                                )
+                            } else {
+                                synthEvents.add(
+                                    SynthNoteEvent(
+                                        timeMs = timeMs,
+                                        frequency = frequency * 1.5,
+                                        type = AudioEngine.WaveType.SINE,
+                                        durationMs = 80,
+                                        volume = 0.04f
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+            val finalSongDuration = if (gameEvents.isEmpty() && synthEvents.isEmpty()) {
+                60000L
+            } else {
+                val maxGameTime = gameEvents.maxOfOrNull { it.hitTimeMs } ?: 0L
+                val maxSynthTime = synthEvents.maxOfOrNull { it.timeMs } ?: 0L
+                (maxOf(maxGameTime, maxSynthTime) + 2000L).coerceAtLeast(10000L)
+            }
+            
+            val stepMs = (60000.0 / bpm / 2.0).toLong()
+            val totalSteps = (finalSongDuration / stepMs).toInt()
+            
+            for (step in 0 until totalSteps) {
+                val timeMs = step * stepMs
+                if (timeMs >= finalSongDuration - 1500) break
+                
+                val stepInBar = step % 16
+                
+                if (stepInBar == 0 || stepInBar == 8) {
+                    synthEvents.add(
+                        SynthNoteEvent(
+                            timeMs = timeMs,
+                            frequency = 90.0,
+                            type = AudioEngine.WaveType.SINE,
+                            durationMs = 150,
+                            volume = 0.18f,
+                            pitchSlide = -300.0
+                        )
+                    )
+                }
+                if (stepInBar == 4 || stepInBar == 12) {
+                    synthEvents.add(
+                        SynthNoteEvent(
+                            timeMs = timeMs,
+                            frequency = 420.0,
+                            type = AudioEngine.WaveType.NOISE,
+                            durationMs = 60,
+                            volume = 0.08f
+                        )
+                    )
+                }
+                
+                if (stepInBar % 4 == 0) {
+                    val rootBass = when ((step / 16) % 4) {
+                        0 -> 110.0
+                        1 -> 82.41
+                        2 -> 98.00
+                        3 -> 73.42
+                        else -> 110.0
+                    }
+                    synthEvents.add(
+                        SynthNoteEvent(
+                            timeMs = timeMs,
+                            frequency = rootBass,
+                            type = AudioEngine.WaveType.TRIANGLE,
+                            durationMs = (stepMs * 1.5).toInt(),
+                            volume = 0.10f
+                        )
+                    )
+                }
+            }
+            
+            return Song(
+                name = songName,
+                bpm = bpm,
+                difficulty = "FNF",
+                durationMs = finalSongDuration,
+                synthNotes = synthEvents.sortedBy { it.timeMs },
+                gameNotes = gameEvents.sortedBy { it.hitTimeMs }
             )
         }
 

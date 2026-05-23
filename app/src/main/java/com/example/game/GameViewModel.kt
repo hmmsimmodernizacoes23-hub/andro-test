@@ -76,11 +76,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // --- Audio Engine ---
     private val audioEngine = AudioEngine()
 
-    // --- Preset Songs ---
-    val songs = Song.createPresetSongs()
+    // --- Preset Songs & FNF Imports ---
+    val songs = mutableStateListOf<Song>().apply {
+        addAll(Song.createPresetSongs())
+    }
     
     private val _selectedSong = MutableStateFlow(songs[0])
     val selectedSong: StateFlow<Song> = _selectedSong.asStateFlow()
+
+    fun importFnfChart(jsonString: String): Boolean {
+        return try {
+            val customSong = Song.parseFnfJson(jsonString)
+            songs.add(customSong)
+            changeSelectedSong(customSong)
+            true
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
 
     // --- Local High Score for selected song ---
     private val _highScore = MutableStateFlow<ScoreRecord?>(null)
