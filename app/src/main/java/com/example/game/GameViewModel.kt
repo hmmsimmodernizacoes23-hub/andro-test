@@ -496,6 +496,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     voicesPlayer?.setVolume(1.0f, 1.0f)
                 } catch (e: Exception) {}
+                try {
+                    instPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
             }
             "GREAT" -> {
                 _greatCount.value++
@@ -505,6 +508,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 triggerFloatingText("GREAT", "#00FFAE", note.lane, 1.0f) // Neon green-cyan
                 try {
                     voicesPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
+                try {
+                    instPlayer?.setVolume(1.0f, 1.0f)
                 } catch (e: Exception) {}
             }
             "GOOD" -> {
@@ -516,6 +522,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     voicesPlayer?.setVolume(1.0f, 1.0f)
                 } catch (e: Exception) {}
+                try {
+                    instPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
             }
             "MISS" -> {
                 _missCount.value++
@@ -524,6 +533,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 triggerFloatingText("MISS", "#FF2255", note.lane, 1.0f) // Red-Pink
                 try {
                     voicesPlayer?.setVolume(0.0f, 0.0f)
+                } catch (e: Exception) {}
+                try {
+                    instPlayer?.setVolume(0.0f, 0.0f)
                 } catch (e: Exception) {}
 
                 // Synthesize retro distortion drop for miss penalty!
