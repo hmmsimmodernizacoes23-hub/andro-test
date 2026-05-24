@@ -26,7 +26,8 @@ class Song(
     val durationMs: Long,
     val synthNotes: List<SynthNoteEvent>,
     val gameNotes: List<GameNoteEvent>,
-    val audioOggUri: String? = null
+    val audioInstUri: String? = null,
+    val audioVoicesUri: String? = null
 ) {
     companion object {
         // Pentatonic Scale: A, C, D, E, G
@@ -49,88 +50,86 @@ class Song(
             )
         }
 
-        fun parseFnfJson(jsonString: String, audioOggUri: String? = null): Song {
+        fun parseFnfJson(
+            jsonString: String,
+            audioInstUri: String? = null,
+            audioVoicesUri: String? = null
+        ): Song {
             val root = JSONObject(jsonString)
             val songObj = root.optJSONObject("song") ?: root
-            val songName = songObj.optString("song", "FNF Custom").uppercase()
-            val bpm = songObj.optInt("bpm", 150)
+            
+            // Extremely robust: look for different possible field names for song title
+            val songName = songObj.optString("song", 
+                songObj.optString("name", 
+                    songObj.optString("songId", 
+                        songObj.optString("title", "FNF Custom")
+                    )
+                )
+            ).uppercase()
+            
+            // Robust bpm parsing
+            val bpm = songObj.optDouble("bpm", 
+                songObj.optDouble("BPM", 150.0)
+            ).toInt()
             
             val gameEvents = mutableListOf<GameNoteEvent>()
             val synthEvents = mutableListOf<SynthNoteEvent>()
-            
             var noteIdCounter = 0
-            val sectionsArray = songObj.optJSONArray("notes")
             
-            if (sectionsArray != null) {
-                for (s in 0 until sectionsArray.length()) {
-                    val section = sectionsArray.optJSONObject(s) ?: continue
-                    val mustHit = section.optBoolean("mustHitSection", true)
-                    val sectionNotes = section.optJSONArray("sectionNotes") ?: continue
-                    
-                    for (n in 0 until sectionNotes.length()) {
-                        val noteArr = sectionNotes.optJSONArray(n) ?: continue
-                        if (noteArr.length() >= 2) {
-                            val timeMs = noteArr.optDouble(0).toLong()
-                            val rawLane = noteArr.optInt(1)
-                            val sustainMs = if (noteArr.length() >= 3) noteArr.optDouble(2).toLong() else 0L
-                            
-                            val isPlayer: Boolean
-                            val mappedLane: Int
-                            
-                            if (rawLane in 0..7) {
-                                if (mustHit) {
-                                    isPlayer = rawLane < 4
-                                    mappedLane = if (isPlayer) rawLane else rawLane - 4
-                                } else {
-                                    isPlayer = rawLane >= 4
-                                    mappedLane = if (isPlayer) rawLane - 4 else rawLane
-                                }
-                            } else {
-                                isPlayer = true
-                                mappedLane = (rawLane % 4).coerceAtLeast(0)
-                            }
-                            
-                            if (isPlayer) {
-                                gameEvents.add(
-                                    GameNoteEvent(
-                                        id = noteIdCounter++,
-                                        lane = mappedLane,
-                                        hitTimeMs = timeMs,
-                                        holdDurationMs = sustainMs
-                                    )
-                                )
-                            }
-                            
-                            val frequency = when (mappedLane) {
-                                0 -> 261.63 // C4
-                                1 -> 293.66 // D4
-                                2 -> 329.63 // E4
-                                3 -> 392.00 // G4
-                                else -> 440.00
-                            }
-                            
-                            if (!isPlayer) {
-                                synthEvents.add(
-                                    SynthNoteEvent(
-                                        timeMs = timeMs,
-                                        frequency = frequency,
-                                        type = AudioEngine.WaveType.SAWTOOTH,
-                                        durationMs = if (sustainMs > 50) sustainMs.toInt() else 120,
-                                        volume = 0.12f
-                                    )
-                                )
-                            } else {
-                                synthEvents.add(
-                                    SynthNoteEvent(
-                                        timeMs = timeMs,
-                                        frequency = frequency * 1.5,
-                                        type = AudioEngine.WaveType.SINE,
-                                        durationMs = 80,
-                                        volume = 0.04f
-                                    )
-                                )
-                            }
+            // Check if there are notes defined in the song JSON
+            val notesValue = songObj.opt("notes")
+            
+            if (notesValue is org.json.JSONArray) {
+                // Determine layout: section-based (original FNF) or flat-list (some newer builders / other software)
+                val firstElem = notesValue.opt(0)
+                if (firstElem is JSONObject && (firstElem.has("sectionNotes") || firstElem.has("mustHitSection"))) {
+                    // CASE A: Classic section-based chart
+                    for (s in 0 until notesValue.length()) {
+                        val section = notesValue.optJSONObject(s) ?: continue
+                        val mustHit = section.optBoolean("mustHitSection", true)
+                        val sectionNotes = section.optJSONArray("sectionNotes") ?: section.optJSONArray("notes") ?: continue
+                        
+                        for (n in 0 until sectionNotes.length()) {
+                            parseSingleNoteElement(
+                                element = sectionNotes.opt(n),
+                                mustHit = mustHit,
+                                gameEvents = gameEvents,
+                                synthEvents = synthEvents,
+                                noteIdCounter = { noteIdCounter++ }
+                            )
                         }
+                    }
+                } else {
+                    // CASE B: Flat array of note objects or raw arrays
+                    for (n in 0 until notesValue.length()) {
+                        parseSingleNoteElement(
+                            element = notesValue.opt(n),
+                            mustHit = true,
+                            gameEvents = gameEvents,
+                            synthEvents = synthEvents,
+                            noteIdCounter = { noteIdCounter++ }
+                        )
+                    }
+                }
+            } else if (notesValue is JSONObject) {
+                // CASE C: Notes grouped by difficulty key (e.g. {"easy": [...], "normal": [...]}) -> load the first non-empty list
+                val keys = notesValue.keys()
+                var foundNotes = false
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    val arr = notesValue.optJSONArray(key) ?: continue
+                    if (arr.length() > 0) {
+                        for (n in 0 until arr.length()) {
+                            parseSingleNoteElement(
+                                element = arr.opt(n),
+                                mustHit = true,
+                                gameEvents = gameEvents,
+                                synthEvents = synthEvents,
+                                noteIdCounter = { noteIdCounter++ }
+                            )
+                        }
+                        foundNotes = true
+                        break // loaded first difficulty track found
                     }
                 }
             }
@@ -203,8 +202,114 @@ class Song(
                 durationMs = finalSongDuration,
                 synthNotes = synthEvents.sortedBy { it.timeMs },
                 gameNotes = gameEvents.sortedBy { it.hitTimeMs },
-                audioOggUri = audioOggUri
+                audioInstUri = audioInstUri,
+                audioVoicesUri = audioVoicesUri
             )
+        }
+
+        private fun parseSingleNoteElement(
+            element: Any?,
+            mustHit: Boolean,
+            gameEvents: MutableList<GameNoteEvent>,
+            synthEvents: MutableList<SynthNoteEvent>,
+            noteIdCounter: () -> Int
+        ) {
+            if (element == null) return
+            
+            var timeMs: Long = 0L
+            var rawLane: Int = 0
+            var sustainMs: Long = 0L
+            
+            if (element is org.json.JSONArray) {
+                if (element.length() >= 2) {
+                    timeMs = element.optDouble(0).toLong()
+                    rawLane = element.optInt(1)
+                    sustainMs = if (element.length() >= 3) element.optDouble(2).toLong() else 0L
+                } else {
+                    return
+                }
+            } else if (element is JSONObject) {
+                timeMs = element.optDouble("t", 
+                    element.optDouble("time", 
+                        element.optDouble("timeMs", 0.0)
+                    )
+                ).toLong()
+                
+                rawLane = element.optInt("d", 
+                    element.optInt("direction", 
+                        element.optInt("lane", 
+                            element.optInt("noteData", 0)
+                        )
+                    )
+                )
+                
+                sustainMs = element.optDouble("l", 
+                    element.optDouble("length", 
+                        element.optDouble("sustain", 
+                            element.optDouble("hold", 0.0)
+                        )
+                    )
+                ).toLong()
+            } else {
+                return
+            }
+            
+            val isPlayer: Boolean
+            val mappedLane: Int
+            
+            if (rawLane in 0..7) {
+                if (mustHit) {
+                    isPlayer = rawLane < 4
+                    mappedLane = if (isPlayer) rawLane else rawLane - 4
+                } else {
+                    isPlayer = rawLane >= 4
+                    mappedLane = if (isPlayer) rawLane - 4 else rawLane
+                }
+            } else {
+                isPlayer = true
+                mappedLane = (rawLane % 4).coerceAtLeast(0)
+            }
+            
+            if (isPlayer) {
+                gameEvents.add(
+                    GameNoteEvent(
+                        id = noteIdCounter(),
+                        lane = mappedLane,
+                        hitTimeMs = timeMs,
+                        holdDurationMs = sustainMs
+                    )
+                )
+            }
+            
+            val frequency = when (mappedLane) {
+                0 -> 261.63
+                1 -> 293.66
+                2 -> 329.63
+                3 -> 392.00
+                else -> 440.00
+            }
+            
+            if (!isPlayer) {
+                synthEvents.add(
+                    SynthNoteEvent(
+                        timeMs = timeMs,
+                        frequency = frequency,
+                        type = AudioEngine.WaveType.SAWTOOTH,
+                        durationMs = if (sustainMs > 50) sustainMs.toInt() else 120,
+                        volume = 0.12f
+                    )
+                )
+            } else {
+                synthEvents.add(
+                    SynthNoteEvent(
+                        timeMs = timeMs,
+                        frequency = frequency * 1.5,
+                        type = AudioEngine.WaveType.SINE,
+                        durationMs = 80,
+                        volume = 0.04f
+                    )
+                )
+            }
         }
 
         private fun generateProceduralSong(name: String, bpm: Int, difficulty: String): Song {

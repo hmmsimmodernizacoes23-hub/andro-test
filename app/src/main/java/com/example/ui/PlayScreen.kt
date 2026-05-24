@@ -377,6 +377,8 @@ fun TitleScreen(viewModel: GameViewModel) {
     var pastedJsonText by remember { mutableStateOf("") }
     var audioOggInputPath by remember { mutableStateOf("") }
     var selectedAudioUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var audioVoicesInputPath by remember { mutableStateOf("") }
+    var selectedVoicesUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var parseErrorMsg by remember { mutableStateOf<String?>(null) }
     var parseSuccessMsg by remember { mutableStateOf<String?>(null) }
 
@@ -398,6 +400,22 @@ fun TitleScreen(viewModel: GameViewModel) {
         }
     }
 
+    val voicesLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            selectedVoicesUri = uri
+            val cursor = context.contentResolver.query(uri, null, null, null, null)
+            val nameIndex = cursor?.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            var displayName = ""
+            if (cursor != null && nameIndex != null && cursor.moveToFirst()) {
+                displayName = cursor.getString(nameIndex)
+            }
+            cursor?.close()
+            audioVoicesInputPath = if (displayName.isNotEmpty()) displayName else uri.toString()
+        }
+    }
+
     // Trigger initial observing hook
     LaunchedEffect(selectedSong) {
         viewModel.observeHighScoreForSelectedSong()
@@ -410,6 +428,8 @@ fun TitleScreen(viewModel: GameViewModel) {
                 pastedJsonText = ""
                 audioOggInputPath = ""
                 selectedAudioUri = null
+                audioVoicesInputPath = ""
+                selectedVoicesUri = null
                 parseErrorMsg = null
                 parseSuccessMsg = null
             },
@@ -486,7 +506,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                     Spacer(modifier = Modifier.height(2.dp))
 
                     Text(
-                        text = "Add custom .ogg audio (optional):",
+                        text = "Add Instrumental .ogg audio (optional):",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -506,16 +526,16 @@ fun TitleScreen(viewModel: GameViewModel) {
                             },
                             placeholder = {
                                 Text(
-                                    "Paste URL or browse local audio",
+                                    "Paste Inst URL or browse local Inst",
                                     color = colors.lightAccentText.copy(alpha = 0.5f),
-                                    fontSize = 12.sp
+                                    fontSize = 11.sp
                                 )
                             },
                             modifier = Modifier
                                 .weight(1f)
-                                .height(56.dp),
+                                .height(52.dp),
                             textStyle = MaterialTheme.typography.bodySmall.copy(
-                                fontSize = 12.sp
+                                fontSize = 11.sp
                             ),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = colors.accentLavender,
@@ -541,13 +561,82 @@ fun TitleScreen(viewModel: GameViewModel) {
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(0.dp),
                             modifier = Modifier
-                                .width(52.dp)
-                                .height(50.dp)
+                                .width(46.dp)
+                                .height(46.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Browse local files",
+                                contentDescription = "Browse Inst files",
                                 tint = colors.accentPink
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(1.dp))
+
+                    Text(
+                        text = "Add Voices/Vocals .ogg audio (optional):",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = colors.lightAccentText
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = audioVoicesInputPath,
+                            onValueChange = {
+                                audioVoicesInputPath = it
+                                selectedVoicesUri = null // clear picker if typed URL instead
+                            },
+                            placeholder = {
+                                Text(
+                                    "Paste Voices URL or browse local Voices",
+                                    color = colors.lightAccentText.copy(alpha = 0.5f),
+                                    fontSize = 11.sp
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(52.dp),
+                            textStyle = MaterialTheme.typography.bodySmall.copy(
+                                fontSize = 11.sp
+                            ),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colors.accentLavender,
+                                unfocusedBorderColor = colors.keyPassiveBg,
+                                focusedTextColor = colors.textLight,
+                                unfocusedTextColor = colors.textLight
+                            ),
+                            singleLine = true
+                        )
+
+                        Button(
+                            onClick = {
+                                try {
+                                    voicesLauncher.launch("audio/*")
+                                } catch (e: Exception) {
+                                    parseErrorMsg = "Could not launch file picker."
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colors.keyPassiveBg,
+                                contentColor = colors.textLight
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier
+                                .width(46.dp)
+                                .height(46.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = "Browse voices files",
+                                tint = colors.accentLavender
                             )
                         }
                     }
@@ -645,7 +734,7 @@ fun TitleScreen(viewModel: GameViewModel) {
                         var finalAudioUriString: String? = null
                         val uri = selectedAudioUri
                         if (uri != null) {
-                            val localPath = viewModel.copyUriToLocalFile(uri, parsedSongForName.name)
+                            val localPath = viewModel.copyUriToLocalFile(uri, parsedSongForName.name, "inst")
                             if (localPath != null) {
                                 finalAudioUriString = localPath
                             }
@@ -653,12 +742,25 @@ fun TitleScreen(viewModel: GameViewModel) {
                             finalAudioUriString = audioOggInputPath
                         }
 
-                        val success = viewModel.importFnfChart(pastedJsonText, finalAudioUriString)
+                        var finalVoicesUriString: String? = null
+                        val vUri = selectedVoicesUri
+                        if (vUri != null) {
+                            val localPath = viewModel.copyUriToLocalFile(vUri, parsedSongForName.name, "voices")
+                            if (localPath != null) {
+                                finalVoicesUriString = localPath
+                            }
+                        } else if (audioVoicesInputPath.isNotBlank()) {
+                            finalVoicesUriString = audioVoicesInputPath
+                        }
+
+                        val success = viewModel.importFnfChart(pastedJsonText, finalAudioUriString, finalVoicesUriString)
                         if (success) {
                             showImportDialog = false
                             pastedJsonText = ""
                             audioOggInputPath = ""
                             selectedAudioUri = null
+                            audioVoicesInputPath = ""
+                            selectedVoicesUri = null
                             parseErrorMsg = null
                             parseSuccessMsg = null
                         } else {
@@ -681,6 +783,8 @@ fun TitleScreen(viewModel: GameViewModel) {
                         pastedJsonText = ""
                         audioOggInputPath = ""
                         selectedAudioUri = null
+                        audioVoicesInputPath = ""
+                        selectedVoicesUri = null
                         parseErrorMsg = null
                         parseSuccessMsg = null
                     }

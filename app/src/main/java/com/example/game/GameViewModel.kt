@@ -90,7 +90,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                             durationMs = parsed.durationMs,
                             synthNotes = parsed.synthNotes,
                             gameNotes = parsed.gameNotes,
-                            audioOggUri = record.audioOggUri
+                            audioInstUri = record.audioOggUri,
+                            audioVoicesUri = record.audioVoicesUri
                         )
                     } catch (e: Exception) {
                         null
@@ -115,8 +116,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // --- Audio Engine ---
     private val audioEngine = AudioEngine()
 
-    // --- Custom .ogg media player ---
-    private var mediaPlayer: android.media.MediaPlayer? = null
+    // --- Custom .ogg media players ---
+    private var instPlayer: android.media.MediaPlayer? = null
+    private var voicesPlayer: android.media.MediaPlayer? = null
 
     // --- Preset Songs & FNF Imports ---
     val songs = mutableStateListOf<Song>().apply {
@@ -126,15 +128,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedSong = MutableStateFlow(songs[0])
     val selectedSong: StateFlow<Song> = _selectedSong.asStateFlow()
 
-    fun importFnfChart(jsonString: String, audioOggUri: String? = null): Boolean {
+    fun importFnfChart(
+        jsonString: String,
+        audioInstUri: String? = null,
+        audioVoicesUri: String? = null
+    ): Boolean {
         return try {
-            val customSong = Song.parseFnfJson(jsonString, audioOggUri)
+            val customSong = Song.parseFnfJson(jsonString, audioInstUri, audioVoicesUri)
             viewModelScope.launch {
                 customSongRepository.saveCustomSong(
                     CustomSongRecord(
                         songName = customSong.name,
                         jsonContent = jsonString,
-                        audioOggUri = audioOggUri
+                        audioOggUri = audioInstUri,
+                        audioVoicesUri = audioVoicesUri
                     )
                 )
                 withContext(Dispatchers.Main) {
@@ -148,12 +155,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun copyUriToLocalFile(uri: android.net.Uri, songName: String): String? {
+    fun copyUriToLocalFile(uri: android.net.Uri, songName: String, typeSuffix: String): String? {
         return try {
             val context = getApplication<Application>()
             val contentResolver = context.contentResolver
             val cleanName = songName.replace(Regex("[^a-zA-Z0-9_]"), "_").lowercase()
-            val outputFile = java.io.File(context.filesDir, "audio_$cleanName.ogg")
+            val outputFile = java.io.File(context.filesDir, "audio_${cleanName}_$typeSuffix.ogg")
             
             contentResolver.openInputStream(uri)?.use { inputStream ->
                 java.io.FileOutputStream(outputFile).use { outputStream ->
@@ -294,31 +301,57 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
         audioEngine.start()
 
-        // Cleanup any old mediaPlayer
+        // Cleanup any old media players
         try {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            instPlayer?.stop()
+            instPlayer?.release()
         } catch (e: Exception) {}
-        mediaPlayer = null
+        instPlayer = null
 
-        val oggUri = _selectedSong.value.audioOggUri
-        val hasOgg = !oggUri.isNullOrBlank()
+        try {
+            voicesPlayer?.stop()
+            voicesPlayer?.release()
+        } catch (e: Exception) {}
+        voicesPlayer = null
+
+        val instUri = _selectedSong.value.audioInstUri
+        val voicesUri = _selectedSong.value.audioVoicesUri
+        val hasOgg = !instUri.isNullOrBlank()
 
         if (hasOgg) {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val mp = android.media.MediaPlayer().apply {
+                    val mainMp = android.media.MediaPlayer().apply {
                         setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
-                        setDataSource(oggUri)
+                        setDataSource(instUri)
                         prepare()
                     }
+                    
+                    var vocMp: android.media.MediaPlayer? = null
+                    if (!voicesUri.isNullOrBlank()) {
+                        try {
+                            vocMp = android.media.MediaPlayer().apply {
+                                setAudioStreamType(android.media.AudioManager.STREAM_MUSIC)
+                                setDataSource(voicesUri)
+                                prepare()
+                            }
+                        } catch (ev: Exception) {
+                            ev.printStackTrace()
+                        }
+                    }
+
                     withContext(Dispatchers.Main) {
                         if (_gameState.value == GameState.PLAYING) {
-                            mediaPlayer = mp
-                            mp.start()
+                            instPlayer = mainMp
+                            voicesPlayer = vocMp
+                            
+                            mainMp.start()
+                            vocMp?.start()
+                            
                             startGameLoop(System.currentTimeMillis())
                         } else {
-                            mp.release()
+                            mainMp.release()
+                            vocMp?.release()
                         }
                     }
                 } catch (e: Exception) {
@@ -339,7 +372,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val synthList = _selectedSong.value.synthNotes
         gameLoopJob = viewModelScope.launch {
             while (_gameState.value == GameState.PLAYING) {
-                val mp = mediaPlayer
+                val mp = instPlayer ?: voicesPlayer
                 val nowTime = if (mp != null) {
                     try {
                         if (mp.isPlaying) {
@@ -356,7 +389,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _songTime.value = nowTime
 
                 // 1. Play Synthesized Musical note events (only if we are NOT playing an OGG audio file)
-                if (mediaPlayer == null) {
+                if (instPlayer == null && voicesPlayer == null) {
                     while (audioScheduleIndex < synthList.size && synthList[audioScheduleIndex].timeMs <= nowTime) {
                         val event = synthList[audioScheduleIndex]
                         audioEngine.playTone(
@@ -398,9 +431,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 // 3. Ending Condition
-                val isSongFinished = if (mediaPlayer != null) {
+                val isSongFinished = if (instPlayer != null) {
                     try {
-                        !mediaPlayer!!.isPlaying && nowTime >= _selectedSong.value.durationMs - 500
+                        !instPlayer!!.isPlaying && nowTime >= _selectedSong.value.durationMs - 500
                     } catch (e: Exception) {
                         nowTime >= _selectedSong.value.durationMs + 1000
                     }
@@ -460,6 +493,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _score.value += 100 + (_combo.value / 10).coerceAtMost(20)
                 _health.value = (_health.value + 0.04f).coerceAtMost(1.0f)
                 triggerFloatingText("PERFECT", "#00FFDD", note.lane, 1.15f) // Glowing cyan
+                try {
+                    voicesPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
             }
             "GREAT" -> {
                 _greatCount.value++
@@ -467,6 +503,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _score.value += 70 + (_combo.value / 10).coerceAtMost(15)
                 _health.value = (_health.value + 0.02f).coerceAtMost(1.0f)
                 triggerFloatingText("GREAT", "#00FFAE", note.lane, 1.0f) // Neon green-cyan
+                try {
+                    voicesPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
             }
             "GOOD" -> {
                 _goodCount.value++
@@ -474,12 +513,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 _score.value += 40 + (_combo.value / 10).coerceAtMost(10)
                 _health.value = (_health.value + 0.01f).coerceAtMost(1.0f)
                 triggerFloatingText("GOOD", "#FFBB00", note.lane, 0.9f) // Bright Orange
+                try {
+                    voicesPlayer?.setVolume(1.0f, 1.0f)
+                } catch (e: Exception) {}
             }
             "MISS" -> {
                 _missCount.value++
                 _combo.value = 0
                 _health.value = (_health.value - 0.08f).coerceAtLeast(0f)
                 triggerFloatingText("MISS", "#FF2255", note.lane, 1.0f) // Red-Pink
+                try {
+                    voicesPlayer?.setVolume(0.0f, 0.0f)
+                } catch (e: Exception) {}
 
                 // Synthesize retro distortion drop for miss penalty!
                 audioEngine.playTone(85.0, AudioEngine.WaveType.NOISE, 150, volume = 0.2f)
@@ -609,10 +654,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         gameLoopJob = null
         audioEngine.stop()
         try {
-            mediaPlayer?.stop()
-            mediaPlayer?.release()
+            instPlayer?.stop()
+            instPlayer?.release()
         } catch (e: Exception) {}
-        mediaPlayer = null
+        instPlayer = null
+        try {
+            voicesPlayer?.stop()
+            voicesPlayer?.release()
+        } catch (e: Exception) {}
+        voicesPlayer = null
     }
 
     fun clearAllHighScores() {

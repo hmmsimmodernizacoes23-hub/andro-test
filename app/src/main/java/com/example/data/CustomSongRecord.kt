@@ -8,5 +8,6 @@ data class CustomSongRecord(
     @PrimaryKey val songName: String,
     val jsonContent: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val audioOggUri: String? = null
+    val audioOggUri: String? = null,
+    val audioVoicesUri: String? = null
 )
